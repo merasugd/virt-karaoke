@@ -433,7 +433,7 @@ export async function installYtDlp(forceUpdate: boolean = false): Promise<string
       }
     }
 
-    progressController = await createProgressWindow(true);
+    progressController = await createProgressWindow(true, false);
     progressController.setTitle(installedVersion ? 'Updating yt-dlp' : 'Installing yt-dlp');
     progressController.setMessage('Fetching latest version...');
     progressController.setIndeterminate(true);

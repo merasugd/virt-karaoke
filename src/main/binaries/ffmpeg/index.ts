@@ -11,7 +11,6 @@ import adm from 'adm-zip'
 import * as tar from 'tar'
 import * as sevenBin from '../7zip/index'
 import seven from 'node-7z'
-import { promisify } from 'util'
 
 type UrlResolver = string | ((platform: Pick<PlatformInfo, 'name'>) => string)
 type BinaryPathResolver = string | ((platform: PlatformInfo<string>) => string)
@@ -307,9 +306,9 @@ async function extractArchive(
   try {
     if (ext === '.zip') {
       const zip = new adm(archivePath)
-      await promisify(zip.extractAllTo)(extractDir, true, true, undefined)
+      zip.extractAllTo(extractDir, true, true, undefined)
     } else if (ext === '.7z') {
-      await promisify(seven.extractFull)(archivePath, extractDir, {
+      seven.extractFull(archivePath, extractDir, {
         $bin: sevenBin.path7za
       })
     } else if (ext === '.xz' || archivePath.endsWith('.tar.xz')) {
@@ -419,7 +418,7 @@ async function installFFmpeg(forceUpdate: boolean = false): Promise<string> {
   let progressController
 
   try {
-    progressController = await createProgressWindow(true)
+    progressController = await createProgressWindow(true, false);
     progressController.setTitle(installedVersion ? 'Updating FFmpeg' : 'Installing FFmpeg')
     progressController.setMessage('Preparing download...')
 

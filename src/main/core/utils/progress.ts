@@ -11,15 +11,15 @@ export interface ProgressController {
   close: () => void;
 }
 
-export async function createProgressWindow(alwaysOnTop: boolean): Promise<ProgressController> {
+export async function createProgressWindow(alwaysOnTop: boolean, skipTaskbar: boolean): Promise<ProgressController> {
   const win = new BrowserWindow({
     width: 460,
     height: 140,
     frame: false,
     resizable: false,
-    skipTaskbar: true,
+    skipTaskbar,
     transparent: true,
-    alwaysOnTop: alwaysOnTop,
+    alwaysOnTop,
     hasShadow: true,
     webPreferences: {
       nodeIntegration: true,

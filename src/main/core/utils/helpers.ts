@@ -97,7 +97,7 @@ export async function prepareAssets() {
   fs.mkdirSync(assetsDir, { recursive: true });
 
   const cache = loadCache();
-  const progress = await createProgressWindow(true);
+  const progress = await createProgressWindow(true, false);
 
   try {
     progress.setTitle("Preparing Assets");
