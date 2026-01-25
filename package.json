@@ -1,6 +1,6 @@
 {
   "name": "virt-karaoke",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A virtual karaoke program",
   "main": "./out/main/index.js",
   "author": "Merasu",
