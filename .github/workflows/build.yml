@@ -1,0 +1,243 @@
+name: Build & Release Virtual Karaoke
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    if: "!contains(github.event.head_commit.message, '[file]')"
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows builds - x64, ia32, arm64
+          - os: windows-latest
+            platform: win
+            build_cmd: npm run build:win
+
+          # macOS builds - universal (arm64 + x64)
+          - os: macos-latest
+            platform: mac
+            build_cmd: npm run build:mac
+
+          # Linux builds - x64, arm64, armv7l
+          - os: ubuntu-latest
+            platform: linux
+            build_cmd: npm run build:linux
+
+    steps:
+      # ────────────────────────────────────────────────
+      # Checkout
+      # ────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ────────────────────────────────────────────────
+      # Node.js
+      # ────────────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # ────────────────────────────────────────────────
+      # Bun
+      # ────────────────────────────────────────────────
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      # ────────────────────────────────────────────────
+      # Linux dependencies
+      # ────────────────────────────────────────────────
+      - name: Install Linux dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libarchive-tools
+
+      # ────────────────────────────────────────────────
+      # Install deps
+      # ────────────────────────────────────────────────
+      - name: Install dependencies
+        run: npm ci
+
+      # ────────────────────────────────────────────────
+      # Read version
+      # ────────────────────────────────────────────────
+      - name: Read version from package.json
+        id: get_version
+        run: |
+          echo "version=v$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      # ────────────────────────────────────────────────
+      # Decide release
+      # ────────────────────────────────────────────────
+      - name: Should create release
+        id: should_release
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "create_release=true" >> $GITHUB_OUTPUT
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          elif [[ "${GITHUB_EVENT_NAME}" == "push" && "${{ contains(github.event.head_commit.message, '[build]') }}" == "true" ]]; then
+            echo "create_release=true" >> $GITHUB_OUTPUT
+            echo "tag=${{ steps.get_version.outputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "create_release=false" >> $GITHUB_OUTPUT
+          fi
+
+      # ────────────────────────────────────────────────
+      # Build per OS
+      # ────────────────────────────────────────────────
+      - name: Build Electron app
+        if: steps.should_release.outputs.create_release == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          echo "🏗 Building ${{ matrix.platform }}"
+          ${{ matrix.build_cmd }}
+
+      # ────────────────────────────────────────────────
+      # Upload artifacts from each OS
+      # ────────────────────────────────────────────────
+      - name: Upload build artifacts
+        if: |
+          always() &&
+          (steps.should_release.outputs.create_release == 'true' || github.event_name == 'workflow_dispatch')
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.platform }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.zip
+            dist/*.tar.gz
+            dist/latest*.yml
+          retention-days: 7
+          if-no-files-found: warn
+
+  # ────────────────────────────────────────────────
+  # Separate job: Create ONE release after all builds
+  # ────────────────────────────────────────────────
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: |
+      always() &&
+      (needs.build.result == 'success' || needs.build.result == 'failure') &&
+      (startsWith(github.ref, 'refs/tags/') ||
+      contains(github.event.head_commit.message, '[build]')) &&
+      !contains(github.event.head_commit.message, '[file]')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read version from package.json
+        id: get_version
+        run: |
+          echo "version=v$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Determine tag
+        id: determine_tag
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ steps.get_version.outputs.version }}" >> $GITHUB_OUTPUT
+          fi
+
+      # Download all artifacts from all OS builds
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: build-win
+          path: dist-windows
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: build-mac
+          path: dist-macos
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: build-linux
+          path: dist-linux
+
+      # Combine all artifacts
+      - name: Prepare release files
+        run: |
+          mkdir -p dist-all
+
+          # Copy all artifacts
+          find dist-windows -type f -exec cp {} dist-all/ \; 2>/dev/null || true
+          find dist-macos -type f -exec cp {} dist-all/ \; 2>/dev/null || true
+          find dist-linux -type f -exec cp {} dist-all/ \; 2>/dev/null || true
+
+          echo "📦 Release files:"
+          ls -lah dist-all/ || echo "No files found"
+
+      # Create ONE release with all files
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.determine_tag.outputs.tag }}
+          name: Virtual Karaoke ${{ steps.get_version.outputs.version }}
+          body: |
+            ## 🤖 Automated Release
+
+            This release was automatically generated.
+
+            ### 📥 Downloads
+
+            #### 🪟 Windows
+            - `Virtual Karaoke-{version}-win-x64-setup.exe` - 64-bit Intel/AMD
+            - `Virtual Karaoke-{version}-win-ia32-setup.exe` - 32-bit Intel
+            - `Virtual Karaoke-{version}-win-arm64-setup.exe` - ARM64 (Surface Pro X, etc.)
+
+            #### 🍎 macOS
+            - `Virtual Karaoke-{version}-mac-universal.dmg` - Universal (Intel + Apple Silicon)
+
+            #### 🐧 Linux
+            - `Virtual Karaoke-{version}-linux-x64.AppImage` - 64-bit Intel/AMD
+            - `Virtual Karaoke-{version}-linux-arm64.AppImage` - 64-bit ARM (Raspberry Pi 4/5, etc.)
+            - `Virtual Karaoke-{version}-linux-armv7l.AppImage` - 32-bit ARM (older Raspberry Pi)
+
+            **Linux Note:** Make AppImage executable with `chmod +x Virtual-Karaoke-*.AppImage`
+
+            ### 🔧 Build Information
+            - **Version**: ${{ steps.get_version.outputs.version }}
+            - **Build Date**: ${{ github.event.head_commit.timestamp }}
+            - **Commit**: [`${{ github.sha }}`](${{ github.event.repository.html_url }}/commit/${{ github.sha }})
+            - **Workflow Run**: [#${{ github.run_number }}](${{ github.event.repository.html_url }}/actions/runs/${{ github.run_id }})
+
+            ---
+
+            _For issues or questions, please [open an issue](${{ github.event.repository.html_url }}/issues)._
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+          draft: false
+          prerelease: false
+          files: |
+            remote_app/prebuilt/*
+            dist-all/*

@@ -1,0 +1,59 @@
+node_modules
+dist
+out
+.DS_Store
+.eslintcache
+*.log*
+
+
+# FLUTTER
+# Miscellaneous
+remote_app/source/*.class
+remote_app/source/*.log
+remote_app/source/*.pyc
+remote_app/source/*.swp
+remote_app/source/.DS_Store
+remote_app/source/.atom/
+remote_app/source/.build/
+remote_app/source/.buildlog/
+remote_app/source/.history
+remote_app/source/.svn/
+remote_app/source/.swiftpm/
+remote_app/source/migrate_working_dir/
+
+# IntelliJ related
+remote_app/source/*.iml
+remote_app/source/*.ipr
+remote_app/source/*.iws
+remote_app/source/.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+remote_app/source/**/doc/api/
+remote_app/source/**/ios/Flutter/.last_build_id
+remote_app/source/.dart_tool/
+remote_app/source/.flutter-plugins-dependencies
+remote_app/source/.pub-cache/
+remote_app/source/.pub/
+remote_app/source/build/
+remote_app/source/coverage/
+
+# Flutter ephemeral files
+remote_app/source/linux/flutter/ephemeral/
+remote_app/source/windows/flutter/ephemeral/
+remote_app/source/macos/Flutter/ephemeral/
+
+# Symbolication related
+remote_app/source/app.*.symbols
+
+# Obfuscation related
+remote_app/source/app.*.map.json
+
+# Android Studio will place build artifacts here
+remote_app/source/android/app/debug
+remote_app/source/android/app/profile
+remote_app/source/android/app/release
