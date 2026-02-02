@@ -5,6 +5,13 @@ and the **[Keep a Changelog](__https://keepachangelog.com/__)** format.
 
 ---
 
+## [1.1.2] - 2026-02-02
+
+### 🐛 Fixed
+- **Idle Video**: The issue was just adding multiple inputs to FFmpeg without telling it how to combine them. FFmpeg needed explicit concatenation instructions.
+
+---
+
 ## [1.1.1] - 2026-02-02
 
 ### 🐛 Fixed

@@ -200,25 +200,72 @@ export async function prepareAssets() {
         progress.setMessage(`Encoding ${idleVideoFiles.length} video file(s)...`);
 
         await new Promise<void>((resolve, reject) => {
-          const cmd = ffmpeg();
+          if (idleVideoFiles.length === 1) {
+            // Single file - simple encode
+            ffmpeg(idleVideoFiles[0])
+              .videoCodec("libx264")
+              .audioCodec("aac")
+              .outputOptions([
+                '-preset fast',
+                '-crf 23',
+                '-pix_fmt yuv420p'
+              ])
+              .on("progress", (p) => {
+                const percent = Math.min(100, Math.round(p.percent || 0));
+                progress.setProgress(33 + Math.round(percent * 0.33));
+                progress.setMessage(`Encoding video: ${percent}%`);
+              })
+              .on("end", () => {
+                cache.videoHash = hash;
+                progress.setMessage("Video encoded ✓");
+                resolve();
+              })
+              .on("error", reject)
+              .save(output);
+          } else {
+            // Multiple files - use concat demuxer
+            const concatListPath = path.join(assetsDir, "concat-list.txt");
+            const concatList = idleVideoFiles
+              .map(f => `file '${f.replace(/'/g, "'\\''")}'`)
+              .join('\n');
 
-          idleVideoFiles.forEach((f) => cmd.input(f));
+            fs.writeFileSync(concatListPath, concatList);
 
-          cmd
-            .videoCodec("libx264")
-            .audioCodec("aac")
-            .on("progress", (p) => {
-              const percent = Math.min(100, Math.round(p.percent || 0));
-              progress.setProgress(33 + Math.round(percent * 0.33));
-              progress.setMessage(`Encoding video: ${percent}%`);
-            })
-            .on("end", () => {
-              cache.videoHash = hash;
-              progress.setMessage("Video encoded ✓");
-              resolve();
-            })
-            .on("error", reject)
-            .save(output);
+            ffmpeg()
+              .input(concatListPath)
+              .inputOptions(['-f concat', '-safe 0'])
+              .videoCodec("libx264")
+              .audioCodec("aac")
+              .outputOptions([
+                '-preset fast',
+                '-crf 23',
+                '-pix_fmt yuv420p'
+              ])
+              .on("progress", (p) => {
+                const percent = Math.min(100, Math.round(p.percent || 0));
+                progress.setProgress(33 + Math.round(percent * 0.33));
+                progress.setMessage(`Concatenating videos: ${percent}%`);
+              })
+              .on("end", () => {
+                // Clean up concat list file
+                try {
+                  fs.unlinkSync(concatListPath);
+                } catch (e) {
+                  console.warn("[assets] Could not delete concat list:", e);
+                }
+                cache.videoHash = hash;
+                progress.setMessage("Video encoded ✓");
+                resolve();
+              })
+              .on("error", (err) => {
+                // Clean up concat list file on error
+                try {
+                  fs.unlinkSync(concatListPath);
+                } catch (e) {}
+                reject(err);
+              })
+              .save(output);
+          }
         });
 
         progress.setProgress(66);
