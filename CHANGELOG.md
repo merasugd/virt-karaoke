@@ -5,6 +5,15 @@ and the **[Keep a Changelog](__https://keepachangelog.com/__)** format.
 
 ---
 
+## [1.1.1] - 2026-02-02
+
+### 🐛 Fixed
+- **Flash overlay persistence**: Fixed issue where PAUSED overlay would linger on screen when transitioning to idle state
+- **State cleanup**: Improved cleanup of flash messages and pause state when songs are skipped or ended
+- **Visual feedback**: Flash overlays now properly hide when entering idle mode or starting new songs
+
+---
+
 ## [1.1.0] - 2026-02-02
 
 ### 🎮 Added - Playback Controls

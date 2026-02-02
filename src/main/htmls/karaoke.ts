@@ -603,6 +603,10 @@ const template = `<!DOCTYPE html>
         state.isTransitioning = true;
         state.current = 'idle';
 
+        // Hide flash message (e.g., lingering PAUSED overlay)
+        hideFlashMessage();
+        isPaused = false;
+
         // Show idle overlay
         fadeIn(DOM.idleCenter);
 
@@ -654,6 +658,10 @@ const template = `<!DOCTYPE html>
         state.isTransitioning = true;
         state.current = 'karaoke';
         state.lastSongId = songData.songId;
+
+        // Hide any lingering flash messages when starting a new song
+        hideFlashMessage();
+        isPaused = false;
 
         // Update karaoke overlay
         safeSetContent(DOM.karaokeCode, '000000');
@@ -771,7 +779,7 @@ const template = `<!DOCTYPE html>
           } else if (data.type === 'playbackControl') {
             // Handle playback controls
             log('Playback control:', data.action);
-            
+
             if (!DOM.songVideo) return;
 
             switch (data.action) {
