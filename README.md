@@ -349,10 +349,8 @@ Download additional karaoke songs from online sources.
 - Delete downloaded songs you no longer want
 - Skip the currently playing song
 - Shut down the entire karaoke system (Advanced tab)
-
-❌ **What You CANNOT Do**:
-- Adjust playback volume (uses system volume of the device viewing the karaoke display, no playback volume)
-- Pause or resume songs (songs play through or skip)
+- Adjust playback volume
+- Pause or resume songs
 - Reorder queue after songs are added
 - Remove specific songs from the queue
 
