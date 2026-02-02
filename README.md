@@ -10,6 +10,7 @@ A open-source desktop karaoke application built with Electron, React, and TypeSc
 - [Getting Started](#getting-started)
   - [Installation](#installation)
   - [First Run Setup](#first-run-setup)
+- [Changelog](#changelog)
 - [How to Use](#how-to-use)
   - [Main Interface](#main-interface)
   - [Settings Configuration](#settings-configuration)
@@ -53,6 +54,8 @@ A open-source desktop karaoke application built with Electron, React, and TypeSc
 
 > Some native binaries (e.g., FFmpeg, YTDLP, 7zip, etc.) will be installed the first time you launch the app.
 
+> Runtimes like nodejs and python are not preinstalled
+
 ### First Run Setup
 
 On your first launch, Virtual Karaoke will:
@@ -67,6 +70,14 @@ On your first launch, Virtual Karaoke will:
 > (Title) - (Artist).mp4
 > ```
 > Example: `Bohemian Rhapsody - Queen.mp4`
+
+---
+
+## 📜 Changelog
+
+See the full list of changes, fixes, and releases here:
+
+➡️ **[CHANGELOG.md](https://github.com/merasugd/virt-karaoke/blob/main/CHANGELOG.md)**
 
 ---
 

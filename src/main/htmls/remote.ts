@@ -448,7 +448,7 @@ const template = `<!DOCTYPE html>
 
       <!-- TABS -->
       <div class="flex mb-6 border-b border-gray-700">
-        <button id="tab-remote" class="flex-1 py-3 font-semibold tab-active transition-colors">Remote</button>
+        <button id="tab-controller" class="flex-1 py-3 font-semibold tab-active transition-colors">Controller</button>
         <button id="tab-songlist" class="flex-1 py-3 font-semibold tab-inactive transition-colors">Songs</button>
         <button id="tab-download" class="flex-1 py-3 font-semibold tab-inactive transition-colors">Download</button>
         <button id="tab-advanced" class="flex-1 py-3 font-semibold tab-inactive transition-colors">Advanced</button>
@@ -457,46 +457,136 @@ const template = `<!DOCTYPE html>
 
     <!-- Content Area (scrollable) -->
     <div class="content-area px-4 pb-8">
-      <!-- REMOTE TAB -->
-      <div id="remote-tab" class="tab-content tab-visible">
-        <div class="grid grid-cols-3 gap-4 mb-6">
-          <% for (let i = 1; i <= 9; i++) { %>
-            <button
-              class="px-5 py-6 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-3xl font-bold rounded-lg"
-              data-digit="<%= i %>"
-              onclick="sendDigit('<%= i %>')">
-              <%= i %>
-            </button>
-          <% } %>
-
-          <button
-            class="px-5 py-6 bg-red-800 hover:bg-red-700 active:bg-red-600 text-3xl font-bold rounded-lg col-span-2"
-            onclick="deleteDigit()">
-            ← Delete
-          </button>
-
-          <button
-            class="px-5 py-6 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-3xl font-bold rounded-lg"
-            data-digit="0"
-            onclick="sendDigit('0')">
-            0
-          </button>
+      <!-- CONTROLLER TAB -->
+      <div id="controller-tab" class="tab-content tab-visible">
+        <!-- Controller Sub-Tabs -->
+        <div class="flex mb-4 border-b border-gray-700">
+          <button id="controller-subtab-remote" class="flex-1 py-2 font-semibold tab-active transition-colors text-sm">Remote</button>
+          <button id="controller-subtab-playback" class="flex-1 py-2 font-semibold tab-inactive transition-colors text-sm">Playback</button>
+          <button id="controller-subtab-queue" class="flex-1 py-2 font-semibold tab-inactive transition-colors text-sm">Queue</button>
         </div>
 
-        <div class="flex flex-col gap-4">
-          <button
-            id="btn-enter"
-            class="py-4 bg-green-700 hover:bg-green-600 active:bg-green-500 text-xl font-semibold rounded-lg"
-            onclick="enterSong()">
-            Enter Song
-          </button>
+        <!-- REMOTE SUB-TAB -->
+        <div id="controller-remote-section" class="tab-content tab-visible">
+          <div class="grid grid-cols-3 gap-4 mb-6">
+            <% for (let i = 1; i <= 9; i++) { %>
+              <button
+                class="px-5 py-6 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-3xl font-bold rounded-lg"
+                data-digit="<%= i %>"
+                onclick="sendDigit('<%= i %>')">
+                <%= i %>
+              </button>
+            <% } %>
 
-          <button
-            id="btn-skip"
-            class="py-4 bg-yellow-700 hover:bg-yellow-600 active:bg-yellow-500 text-xl font-semibold rounded-lg"
-            onclick="skipSong()">
-            Skip Current Song
-          </button>
+            <button
+              class="px-5 py-6 bg-red-800 hover:bg-red-700 active:bg-red-600 text-3xl font-bold rounded-lg col-span-2"
+              onclick="deleteDigit()">
+              ← Delete
+            </button>
+
+            <button
+              class="px-5 py-6 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-3xl font-bold rounded-lg"
+              data-digit="0"
+              onclick="sendDigit('0')">
+              0
+            </button>
+          </div>
+
+          <div class="flex flex-col gap-4">
+            <button
+              id="btn-enter"
+              class="py-4 bg-green-700 hover:bg-green-600 active:bg-green-500 text-xl font-semibold rounded-lg"
+              onclick="enterSong()">
+              Enter Song
+            </button>
+          </div>
+        </div>
+
+        <!-- PLAYBACK SUB-TAB -->
+        <div id="controller-playback-section" class="tab-content tab-hidden">
+          <div class="flex flex-col gap-3">
+            <div class="grid grid-cols-2 gap-3">
+              <button
+                id="btn-pause"
+                class="py-4 bg-orange-700 hover:bg-orange-600 active:bg-orange-500 text-lg font-semibold rounded-lg"
+                onclick="pauseSong()">
+                ⏸ Pause
+              </button>
+              <button
+                id="btn-resume"
+                class="py-4 bg-green-700 hover:bg-green-600 active:bg-green-500 text-lg font-semibold rounded-lg"
+                onclick="resumeSong()">
+                ▶ Resume
+              </button>
+            </div>
+
+            <button
+              id="btn-skip"
+              class="py-4 bg-yellow-700 hover:bg-yellow-600 active:bg-yellow-500 text-lg font-semibold rounded-lg"
+              onclick="skipSong()">
+              ⏭ Skip Song
+            </button>
+
+            <button
+              id="btn-prev"
+              class="py-4 bg-purple-700 hover:bg-purple-600 active:bg-purple-500 text-lg font-semibold rounded-lg"
+              onclick="prevSong()">
+              ⏮ Previous Song
+            </button>
+
+            <div class="grid grid-cols-2 gap-3">
+              <button
+                id="btn-seek-back"
+                class="py-4 bg-blue-700 hover:bg-blue-600 active:bg-blue-500 text-lg font-semibold rounded-lg"
+                onclick="seekBackward()">
+                ⏪ -5s
+              </button>
+              <button
+                id="btn-seek-forward"
+                class="py-4 bg-blue-700 hover:bg-blue-600 active:bg-blue-500 text-lg font-semibold rounded-lg"
+                onclick="seekForward()">
+                ⏩ +5s
+              </button>
+            </div>
+
+            <div class="mt-2">
+              <label class="block text-sm font-medium mb-2">Playback Volume</label>
+              <div class="flex items-center gap-3">
+                <span class="text-sm">🔇</span>
+                <input
+                  id="playback-volume"
+                  type="range"
+                  min="0"
+                  max="100"
+                  value="100"
+                  class="flex-1"
+                  oninput="setPlaybackVolume(this.value)">
+                <span class="text-sm">🔊</span>
+                <span id="volume-display" class="text-sm font-semibold min-w-[3rem] text-right">100%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- QUEUE SUB-TAB -->
+        <div id="controller-queue-section" class="tab-content tab-hidden">
+          <!-- Current Queue -->
+          <h3 class="font-semibold text-lg mb-2">Current Queue</h3>
+          <div id="queue-list-container" class="flex flex-col gap-2">
+            <!-- Queue items will be populated here -->
+          </div>
+          <div id="queue-empty-message" class="text-center text-gray-400 py-4 mb-6">
+            No songs in queue
+          </div>
+
+          <!-- Queue History -->
+          <h3 class="font-semibold text-lg mb-2 mt-6">Recently Played</h3>
+          <div id="queue-history-container" class="flex flex-col gap-2">
+            <!-- History items will be populated here -->
+          </div>
+          <div id="history-empty-message" class="text-center text-gray-400 py-4">
+            No played songs yet
+          </div>
         </div>
       </div>
 
@@ -829,6 +919,7 @@ const template = `<!DOCTYPE html>
         localCode: '',
         serverCode: '',
         queue: [],
+        queueHistory: [],
         currentState: 'idle',
         isConnected: false,
         wsConnected: false,
@@ -872,15 +963,32 @@ const template = `<!DOCTYPE html>
         songCount: document.getElementById('song-count'),
         btnEnter: document.getElementById('btn-enter'),
         btnSkip: document.getElementById('btn-skip'),
+        btnPause: document.getElementById('btn-pause'),
+        btnResume: document.getElementById('btn-resume'),
+        btnPrev: document.getElementById('btn-prev'),
+        btnSeekBack: document.getElementById('btn-seek-back'),
+        btnSeekForward: document.getElementById('btn-seek-forward'),
+        playbackVolume: document.getElementById('playback-volume'),
+        volumeDisplay: document.getElementById('volume-display'),
         btnShutdown: document.getElementById('btn-shutdown'),
-        remoteTab: document.getElementById('remote-tab'),
+        controllerTab: document.getElementById('controller-tab'),
         songlistTab: document.getElementById('songlist-tab'),
         downloadTab: document.getElementById('download-tab'),
         advancedTab: document.getElementById('advanced-tab'),
-        tabRemote: document.getElementById('tab-remote'),
+        tabController: document.getElementById('tab-controller'),
         tabSonglist: document.getElementById('tab-songlist'),
         tabDownload: document.getElementById('tab-download'),
         tabAdvanced: document.getElementById('tab-advanced'),
+        controllerSubtabRemote: document.getElementById('controller-subtab-remote'),
+        controllerSubtabPlayback: document.getElementById('controller-subtab-playback'),
+        controllerSubtabQueue: document.getElementById('controller-subtab-queue'),
+        controllerRemoteSection: document.getElementById('controller-remote-section'),
+        controllerPlaybackSection: document.getElementById('controller-playback-section'),
+        controllerQueueSection: document.getElementById('controller-queue-section'),
+        queueListContainer: document.getElementById('queue-list-container'),
+        queueEmptyMessage: document.getElementById('queue-empty-message'),
+        queueHistoryContainer: document.getElementById('queue-history-container'),
+        historyEmptyMessage: document.getElementById('history-empty-message'),
         shutdownModal: document.getElementById('shutdown-modal'),
         sortBy: document.getElementById('sort-by'),
         filterLetter: document.getElementById('filter-letter'),
@@ -962,6 +1070,11 @@ const template = `<!DOCTYPE html>
           DOM.queueDisplay.textContent = 'Queue: ' + queue.join(' → ');
         } else {
           DOM.queueDisplay.textContent = 'Queue: Empty';
+        }
+
+        // Also update the queue list if on the queue tab
+        if (DOM.controllerQueueSection && DOM.controllerQueueSection.classList.contains('tab-visible')) {
+          updateQueueList(queue);
         }
       }
 
@@ -1240,6 +1353,13 @@ const template = `<!DOCTYPE html>
               updateQueueDisplay(state.queue);
             }
 
+            if (data.queueHistory) {
+              state.queueHistory = data.queueHistory;
+              if (DOM.controllerQueueSection && DOM.controllerQueueSection.classList.contains('tab-visible')) {
+                updateQueueHistory(state.queueHistory);
+              }
+            }
+
             if (data.state) {
               state.currentState = data.state;
             }
@@ -1405,7 +1525,282 @@ const template = `<!DOCTYPE html>
         }
       }
 
-      // ==================== SONG SORTING & FILTERING ====================
+      async function pauseSong() {
+        if (!state.wsConnected) {
+          showStatus('Not connected to server', 2000);
+          return;
+        }
+
+        const response = await sendAction('pause');
+
+        if (response && response.ok) {
+          showStatus('Paused', 1500);
+        } else {
+          showStatus('Failed to pause', 2000);
+        }
+      }
+
+      async function resumeSong() {
+        if (!state.wsConnected) {
+          showStatus('Not connected to server', 2000);
+          return;
+        }
+
+        const response = await sendAction('resume');
+
+        if (response && response.ok) {
+          showStatus('Resumed', 1500);
+        } else {
+          showStatus('Failed to resume', 2000);
+        }
+      }
+
+      async function prevSong() {
+        if (!state.wsConnected) {
+          showStatus('Not connected to server', 2000);
+          return;
+        }
+
+        const response = await sendAction('prev');
+
+        if (response && response.ok) {
+          showStatus('Playing previous song', 1500);
+        } else {
+          showStatus('Failed to go back', 2000);
+        }
+      }
+
+      async function seekForward() {
+        if (!state.wsConnected) {
+          showStatus('Not connected to server', 2000);
+          return;
+        }
+
+        const response = await sendAction('seekForward');
+
+        if (response && response.ok) {
+          showStatus('Seek +5s', 1000);
+        }
+      }
+
+      async function seekBackward() {
+        if (!state.wsConnected) {
+          showStatus('Not connected to server', 2000);
+          return;
+        }
+
+        const response = await sendAction('seekBackward');
+
+        if (response && response.ok) {
+          showStatus('Seek -5s', 1000);
+        }
+      }
+
+      async function setPlaybackVolume(value) {
+        if (!state.wsConnected) {
+          return;
+        }
+
+        const volume = parseInt(value) / 100;
+
+        // Update display
+        if (DOM.volumeDisplay) {
+          DOM.volumeDisplay.textContent = \`\${value}%\`;
+        }
+
+        const response = await sendAction('setVolume', { volume });
+
+        if (!response || !response.ok) {
+          showStatus('Failed to set volume', 2000);
+        }
+      }
+
+      async function removeFromQueue(code) {
+        if (!state.wsConnected) {
+          showStatus('Not connected to server', 2000);
+          return;
+        }
+
+        const response = await sendAction('removeFromQueue', { code });
+
+        if (response && response.ok) {
+          showStatus('Removed from queue', 1500);
+        } else {
+          showStatus('Failed to remove', 2000);
+        }
+      }
+
+      async function reorderQueue(newQueue) {
+        if (!state.wsConnected) {
+          showStatus('Not connected to server', 2000);
+          return;
+        }
+
+        const response = await sendAction('reorderQueue', { newQueue });
+
+        if (response && response.ok) {
+          showStatus('Queue reordered', 1500);
+        } else {
+          showStatus('Failed to reorder', 2000);
+        }
+      }
+
+      // ==================== QUEUE DISPLAY ====================
+      function updateQueueList(queue) {
+        if (!DOM.queueListContainer || !DOM.queueEmptyMessage) return;
+
+        if (!queue || queue.length === 0) {
+          DOM.queueListContainer.innerHTML = '';
+          DOM.queueEmptyMessage.style.display = 'block';
+          return;
+        }
+
+        DOM.queueEmptyMessage.style.display = 'none';
+
+        const html = queue.map((code, index) => {
+          // Look up song from allSongs cache
+          const song = state.allSongs.find(s => s.id === code) || { title: 'Unknown', artist: 'Unknown' };
+          return \`
+            <div class="bg-gray-800 p-3 rounded-lg flex items-center justify-between" draggable="true" data-code="\${code}" data-index="\${index}">
+              <div class="flex items-center gap-3 flex-1 min-w-0">
+                <span class="text-gray-400 font-mono text-sm">#\${index + 1}</span>
+                <div class="flex-1 min-w-0">
+                  <div class="font-semibold truncate">\${song.title}</div>
+                  <div class="text-sm text-gray-400 truncate">\${song.artist}</div>
+                </div>
+              </div>
+              <button
+                class="px-3 py-2 bg-red-700 hover:bg-red-600 text-sm font-semibold rounded-lg"
+                onclick="removeFromQueue('\${code}')">
+                Remove
+              </button>
+            </div>
+          \`;
+        }).join('');
+
+        DOM.queueListContainer.innerHTML = html;
+
+        // Add drag and drop handlers
+        setupQueueDragAndDrop();
+      }
+
+      function setupQueueDragAndDrop() {
+        const items = DOM.queueListContainer?.querySelectorAll('[draggable="true"]');
+        if (!items) return;
+
+        let draggedElement = null;
+
+        items.forEach(item => {
+          item.addEventListener('dragstart', (e) => {
+            draggedElement = item;
+            item.style.opacity = '0.5';
+          });
+
+          item.addEventListener('dragend', (e) => {
+            item.style.opacity = '1';
+          });
+
+          item.addEventListener('dragover', (e) => {
+            e.preventDefault();
+          });
+
+          item.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (draggedElement && draggedElement !== item) {
+              const allItems = [...DOM.queueListContainer.querySelectorAll('[draggable="true"]')];
+              const draggedIndex = allItems.indexOf(draggedElement);
+              const targetIndex = allItems.indexOf(item);
+
+              if (draggedIndex < targetIndex) {
+                item.after(draggedElement);
+              } else {
+                item.before(draggedElement);
+              }
+
+              // Get new order
+              const newQueue = [...DOM.queueListContainer.querySelectorAll('[draggable="true"]')]
+                .map(el => el.dataset.code);
+
+              reorderQueue(newQueue);
+            }
+          });
+        });
+      }
+
+
+      // ==================== QUEUE HISTORY DISPLAY ====================
+      function updateQueueHistory(history) {
+        if (!DOM.queueHistoryContainer || !DOM.historyEmptyMessage) return;
+
+        if (!history || history.length === 0) {
+          DOM.queueHistoryContainer.innerHTML = '';
+          DOM.historyEmptyMessage.style.display = 'block';
+          return;
+        }
+
+        DOM.historyEmptyMessage.style.display = 'none';
+
+        // Show last 20 songs in reverse order (most recent first)
+        const recentHistory = [...history].reverse().slice(0, 20);
+
+        const html = recentHistory.map((entry, index) => {
+          const song = entry.song || { title: 'Unknown', artist: 'Unknown' };
+          const timeAgo = getTimeAgo(entry.timestamp);
+
+          return \`
+            <div class="bg-gray-800 p-3 rounded-lg flex items-center justify-between cursor-pointer hover:bg-gray-700 transition-colors"
+                 onclick="replaySong('\${entry.code}')">
+              <div class="flex items-center gap-3 flex-1 min-w-0">
+                <div class="flex-1 min-w-0">
+                  <div class="font-semibold truncate">\${song.title}</div>
+                  <div class="text-sm text-gray-400 truncate">\${song.artist}</div>
+                  <div class="text-xs text-gray-500 mt-1">\${timeAgo}</div>
+                </div>
+              </div>
+              <button
+                class="px-3 py-2 bg-green-700 hover:bg-green-600 text-sm font-semibold rounded-lg"
+                onclick="event.stopPropagation(); replaySong('\${entry.code}')">
+                Replay
+              </button>
+            </div>
+          \`;
+        }).join('');
+
+        DOM.queueHistoryContainer.innerHTML = html;
+      }
+
+      function getTimeAgo(timestamp) {
+        const seconds = Math.floor((Date.now() - timestamp) / 1000);
+
+        if (seconds < 60) return 'Just now';
+        if (seconds < 3600) return \`\${Math.floor(seconds / 60)}m ago\`;
+        if (seconds < 86400) return \`\${Math.floor(seconds / 3600)}h ago\`;
+        return \`\${Math.floor(seconds / 86400)}d ago\`;
+      }
+
+      async function replaySong(code) {
+        if (!state.wsConnected) {
+          showStatus('Not connected to server', 2000);
+          return;
+        }
+
+        // Ensure code is a 6-digit string
+        const paddedCode = String(code).padStart(6, '0');
+
+        // Auto-digit each digit of the code
+        for (let i = 0; i < paddedCode.length; i++) {
+          await sendDigit(paddedCode.charAt(i));
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        // Auto-enter after digits
+        await new Promise(resolve => setTimeout(resolve, 200));
+        await enterSong();
+
+        showStatus(\`Replaying song: \${paddedCode}\`, 2000);
+      }
+
+            // ==================== SONG SORTING & FILTERING ====================
       function sortSongs(songs, sortBy) {
         const sorted = [...songs];
 
@@ -2304,31 +2699,94 @@ const template = `<!DOCTYPE html>
         }
       }
 
+      function switchControllerSubTab(showSection, hideSections, btnShow, btnHides) {
+        if (!showSection || !btnShow) return;
+
+        const hideSectionsArray = Array.isArray(hideSections) ? hideSections : [hideSections];
+        hideSectionsArray.forEach(section => {
+          if (section) {
+            section.classList.remove('tab-visible');
+            section.classList.add('tab-hidden');
+          }
+        });
+
+        showSection.classList.remove('tab-hidden');
+        showSection.classList.add('tab-visible');
+
+        const btnHidesArray = Array.isArray(btnHides) ? btnHides : [btnHides];
+        btnHidesArray.forEach(btn => {
+          if (btn) {
+            btn.classList.add('tab-inactive');
+            btn.classList.remove('tab-active');
+          }
+        });
+
+        btnShow.classList.add('tab-active');
+        btnShow.classList.remove('tab-inactive');
+
+        // Update queue list and history when switching to queue tab
+        if (showSection === DOM.controllerQueueSection) {
+          updateQueueList(state.queue);
+          updateQueueHistory(state.queueHistory);
+        }
+      }
+
       // ==================== EVENT LISTENERS ====================
       function setupEventListeners() {
         // Tab switching
-        if (DOM.tabRemote) {
-          DOM.tabRemote.onclick = () =>
-            switchTab(DOM.remoteTab, [DOM.songlistTab, DOM.downloadTab, DOM.advancedTab],
-                      DOM.tabRemote, [DOM.tabSonglist, DOM.tabDownload, DOM.tabAdvanced]);
+        if (DOM.tabController) {
+          DOM.tabController.onclick = () => {
+            switchTab(DOM.controllerTab, [DOM.songlistTab, DOM.downloadTab, DOM.advancedTab],
+                      DOM.tabController, [DOM.tabSonglist, DOM.tabDownload, DOM.tabAdvanced]);
+            // Show remote sub-tab by default
+            switchControllerSubTab(DOM.controllerRemoteSection,
+                                  [DOM.controllerPlaybackSection, DOM.controllerQueueSection],
+                                  DOM.controllerSubtabRemote,
+                                  [DOM.controllerSubtabPlayback, DOM.controllerSubtabQueue]);
+          };
         }
 
         if (DOM.tabSonglist) {
           DOM.tabSonglist.onclick = () =>
-            switchTab(DOM.songlistTab, [DOM.remoteTab, DOM.downloadTab, DOM.advancedTab],
-                      DOM.tabSonglist, [DOM.tabRemote, DOM.tabDownload, DOM.tabAdvanced]);
+            switchTab(DOM.songlistTab, [DOM.controllerTab, DOM.downloadTab, DOM.advancedTab],
+                      DOM.tabSonglist, [DOM.tabController, DOM.tabDownload, DOM.tabAdvanced]);
         }
 
         if (DOM.tabDownload) {
           DOM.tabDownload.onclick = () =>
-            switchTab(DOM.downloadTab, [DOM.remoteTab, DOM.songlistTab, DOM.advancedTab],
-                      DOM.tabDownload, [DOM.tabRemote, DOM.tabSonglist, DOM.tabAdvanced]);
+            switchTab(DOM.downloadTab, [DOM.controllerTab, DOM.songlistTab, DOM.advancedTab],
+                      DOM.tabDownload, [DOM.tabController, DOM.tabSonglist, DOM.tabAdvanced]);
         }
 
         if (DOM.tabAdvanced) {
           DOM.tabAdvanced.onclick = () =>
-            switchTab(DOM.advancedTab, [DOM.remoteTab, DOM.songlistTab, DOM.downloadTab],
-                      DOM.tabAdvanced, [DOM.tabRemote, DOM.tabSonglist, DOM.tabDownload]);
+            switchTab(DOM.advancedTab, [DOM.controllerTab, DOM.songlistTab, DOM.downloadTab],
+                      DOM.tabAdvanced, [DOM.tabController, DOM.tabSonglist, DOM.tabDownload]);
+        }
+
+        // Controller sub-tab switching
+        if (DOM.controllerSubtabRemote) {
+          DOM.controllerSubtabRemote.onclick = () =>
+            switchControllerSubTab(DOM.controllerRemoteSection,
+                                  [DOM.controllerPlaybackSection, DOM.controllerQueueSection],
+                                  DOM.controllerSubtabRemote,
+                                  [DOM.controllerSubtabPlayback, DOM.controllerSubtabQueue]);
+        }
+
+        if (DOM.controllerSubtabPlayback) {
+          DOM.controllerSubtabPlayback.onclick = () =>
+            switchControllerSubTab(DOM.controllerPlaybackSection,
+                                  [DOM.controllerRemoteSection, DOM.controllerQueueSection],
+                                  DOM.controllerSubtabPlayback,
+                                  [DOM.controllerSubtabRemote, DOM.controllerSubtabQueue]);
+        }
+
+        if (DOM.controllerSubtabQueue) {
+          DOM.controllerSubtabQueue.onclick = () =>
+            switchControllerSubTab(DOM.controllerQueueSection,
+                                  [DOM.controllerRemoteSection, DOM.controllerPlaybackSection],
+                                  DOM.controllerSubtabQueue,
+                                  [DOM.controllerSubtabRemote, DOM.controllerSubtabPlayback]);
         }
 
         // Download sub-tab switching
@@ -2535,6 +2993,14 @@ const template = `<!DOCTYPE html>
         window.deleteDigit = deleteDigit;
         window.enterSong = enterSong;
         window.skipSong = skipSong;
+        window.pauseSong = pauseSong;
+        window.resumeSong = resumeSong;
+        window.prevSong = prevSong;
+        window.seekForward = seekForward;
+        window.seekBackward = seekBackward;
+        window.setPlaybackVolume = setPlaybackVolume;
+        window.removeFromQueue = removeFromQueue;
+      window.replaySong = replaySong;
 
         connectWebSocket();
 

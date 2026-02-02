@@ -1,3 +1,5 @@
+// ────────── State Broadcast ──────────
+
 import { appState } from '../events/app_state';
 import { wssKaraoke, wssRemote } from '../servers/websocket';
 import { db, Song } from './db';
@@ -16,6 +18,7 @@ export function broadcastState(lastDigit: string | null = null) {
           })()
         : 'Select A Song',
     queue: [...appState.codeQueue],
+    queueHistory: [...appState.queueHistory],
     lastDigit,
     announceKeys: appState.announceKeys,
     backgroundType: appState.idleMode,
@@ -72,6 +75,28 @@ export function broadcastDownloadProgress(
 
   // Only broadcast to remote clients (not karaoke display)
   wssRemote.clients.forEach((client: any) => {
+    if (client.readyState === client.OPEN) client.send(data);
+  });
+}
+
+// Broadcast playback control commands to the Karaoke WebSocket
+export function broadcastPlaybackControl(
+  action: 'pause' | 'resume' | 'prev' | 'seekForward' | 'seekBackward' | 'setVolume',
+  value?: number
+) {
+  const payload: any = {
+    type: 'playbackControl',
+    action
+  };
+
+  if (value !== undefined) {
+    payload.value = value;
+  }
+
+  const data = JSON.stringify(payload);
+
+  // Broadcast to karaoke display only
+  wssKaraoke.clients.forEach((client: any) => {
     if (client.readyState === client.OPEN) client.send(data);
   });
 }

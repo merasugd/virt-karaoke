@@ -10,6 +10,8 @@ import { settings } from '../../settings';
 import { additional_songs } from '../utils/paths';
 
 import icon from '../../../../resources/icon.png?asset';
+import { is } from '@electron-toolkit/utils';
+import { registerYouTubeCookieHandlers } from '../utils/cookie';
 
 // Manage Karaoke Display
 const getIconPath = () => {
@@ -38,7 +40,7 @@ ipcMain.on('host-karaoke-view', async () => {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      devTools: process.env.NODE_ENV === 'development',
+      devTools: is.dev,
       spellcheck: false,
       sandbox: false,
     },
@@ -178,3 +180,7 @@ ipcMain.handle('open-directory', (_, options) => {
 
   return result ? result[0] : null;
 });
+
+// ────────── YouTube Cookie Handlers ──────────
+// Register the encrypted YouTube cookie management handlers
+registerYouTubeCookieHandlers();

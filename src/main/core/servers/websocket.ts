@@ -10,7 +10,7 @@ const wssRemote = new WebSocketServer({ server: remoteServer });
 // Acquire Lock for Karaoke Display
 wssKaraoke.on('connection', (ws: WebSocket) => {
   if (!appState.acquireKaraokeViewer()) {
-    console.log('[ws:karaoke] Rejected – viewer already active');
+    console.log('[ws:karaoke] Rejected - viewer already active');
     ws.close(1008, 'Karaoke display already in use');
     return;
   }

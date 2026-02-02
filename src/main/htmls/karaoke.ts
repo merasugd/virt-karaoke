@@ -97,6 +97,36 @@ const template = `<!DOCTYPE html>
     .ws-status.connected {
       background: #22c55e;
     }
+
+    /* Flash Overlay for Playback Actions */
+    #flash-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 300ms ease;
+    }
+
+    #flash-overlay.show {
+      opacity: 1;
+    }
+
+    #flash-message {
+      background: rgba(0, 0, 0, 0.85);
+      color: white;
+      font-size: 4rem;
+      font-weight: bold;
+      padding: 2rem 4rem;
+      border-radius: 1.5rem;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
   </style>
 </head>
 <body>
@@ -130,6 +160,11 @@ const template = `<!DOCTYPE html>
     </div>
   </div>
 
+  <!-- Flash Overlay for Playback Actions (Always on top) -->
+  <div id="flash-overlay">
+    <div id="flash-message"></div>
+  </div>
+
   <script>
     (function() {
       'use strict';
@@ -161,7 +196,9 @@ const template = `<!DOCTYPE html>
         karaokeCode: document.getElementById('karaoke-code'),
         karaokeStatus: document.getElementById('karaoke-status'),
         karaokeQueue: document.getElementById('karaoke-queue'),
-        wsStatus: document.getElementById('ws-status')
+        wsStatus: document.getElementById('ws-status'),
+        flashOverlay: document.getElementById('flash-overlay'),
+        flashMessage: document.getElementById('flash-message')
       };
 
       // ==================== STATE MANAGEMENT ====================
@@ -389,6 +426,44 @@ const template = `<!DOCTYPE html>
         if (!audio) return;
         audio.pause();
         audio.currentTime = 0;
+      }
+
+      // ==================== FLASH MESSAGE ====================
+      let flashTimeout = null;
+      let isPaused = false;
+
+      function showFlashMessage(message, persistent = false) {
+        if (!DOM.flashOverlay || !DOM.flashMessage) return;
+
+        // Clear any existing timeout
+        if (flashTimeout) {
+          clearTimeout(flashTimeout);
+          flashTimeout = null;
+        }
+
+        // Set message and show
+        safeSetContent(DOM.flashMessage, message);
+        DOM.flashOverlay.classList.add('show');
+
+        // If persistent (like PAUSED), keep it visible
+        if (persistent) {
+          return;
+        }
+
+        // Hide after 1.5 seconds for non-persistent messages
+        flashTimeout = setTimeout(() => {
+          DOM.flashOverlay.classList.remove('show');
+        }, 1500);
+      }
+
+      function hideFlashMessage() {
+        if (flashTimeout) {
+          clearTimeout(flashTimeout);
+          flashTimeout = null;
+        }
+        if (DOM.flashOverlay) {
+          DOM.flashOverlay.classList.remove('show');
+        }
       }
 
       // ==================== TEXT-TO-SPEECH ====================
@@ -692,6 +767,57 @@ const template = `<!DOCTYPE html>
           } else if (data.type === 'songEnd') {
             log('Song end message received');
             state.lastSongId = null;
+
+          } else if (data.type === 'playbackControl') {
+            // Handle playback controls
+            log('Playback control:', data.action);
+            
+            if (!DOM.songVideo) return;
+
+            switch (data.action) {
+              case 'pause':
+                DOM.songVideo.pause();
+                isPaused = true;
+                showFlashMessage('⏸ PAUSED', true); // Persistent overlay
+                break;
+
+              case 'resume':
+                DOM.songVideo.play().catch(err => warn('Resume failed:', err));
+                isPaused = false;
+                hideFlashMessage(); // Hide the persistent pause overlay
+                showFlashMessage('▶ RESUMED'); // Show brief resume message
+                break;
+
+              case 'prev':
+                // Restart song (fallback when no previous song available)
+                DOM.songVideo.currentTime = 0;
+                DOM.songVideo.play().catch(err => warn('Play failed:', err));
+                showFlashMessage('⏮ PREVIOUS');
+                break;
+
+              case 'seekForward':
+                DOM.songVideo.currentTime = Math.min(
+                  DOM.songVideo.currentTime + (data.value || 5),
+                  DOM.songVideo.duration
+                );
+                showFlashMessage('⏩ +5s');
+                break;
+
+              case 'seekBackward':
+                DOM.songVideo.currentTime = Math.max(
+                  DOM.songVideo.currentTime + (data.value || -5),
+                  0
+                );
+                showFlashMessage('⏪ -5s');
+                break;
+
+              case 'setVolume':
+                if (typeof data.value === 'number') {
+                  DOM.songVideo.volume = Math.max(0, Math.min(1, data.value));
+                  showFlashMessage(\`🔊 \${Math.round(data.value * 100)}%\`);
+                }
+                break;
+            }
 
           } else if (data.type === 'pong') {
             // Heartbeat response

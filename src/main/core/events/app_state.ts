@@ -14,6 +14,7 @@ if(!existsSync(main_path)) mkdirSync(main_path, { recursive: true });
 interface StateSnapshot {
   currentCode: string;
   codeQueue: string[];
+  queueHistory: Array<{ code: string; song: Song; timestamp: number }>;
   state: 'idle' | 'karaoke';
   currentSong: Song | null;
   idleBackgroundPath: string;
@@ -69,6 +70,7 @@ export class KaraokeAppState {
   // Playback / queue
   private _currentCode: string = '';
   private _codeQueue: string[] = [];
+  private _queueHistory: Array<{ code: string; song: Song; timestamp: number }> = []; // Queue history with full song data
   private _currentSong: Song | null = null;
   private _state: 'idle' | 'karaoke' = 'idle';
 
@@ -206,6 +208,7 @@ export class KaraokeAppState {
       // Restore state
       this._currentCode = '';
       this._codeQueue = [];
+      this._queueHistory = snapshot.queueHistory || [];
       this._state = 'idle';
       this._currentSong = null;
       this._idleBackgroundPath = '';
@@ -248,6 +251,7 @@ export class KaraokeAppState {
         const snapshot: StateSnapshot = {
           currentCode: this._currentCode,
           codeQueue: [...this._codeQueue],
+          queueHistory: this._queueHistory,
           state: this._state,
           currentSong: this._currentSong ? { ...this._currentSong } : null,
           idleBackgroundPath: this._idleBackgroundPath,
@@ -409,6 +413,17 @@ export class KaraokeAppState {
             }
             this._state = 'karaoke';
             this._currentSong = { ...op.song };
+            // Add current song to history with full data (keep last 100 songs)
+            if (op.code && op.song) {
+              this._queueHistory.push({
+                code: op.code,
+                song: { ...op.song },
+                timestamp: Date.now()
+              });
+              if (this._queueHistory.length > 100) {
+                this._queueHistory.shift();
+              }
+            }
             console.log(`[AppState] → KARAOKE mode | ${op.code} - ${op.song.title}`);
             op.resolve?.();
             break;
@@ -514,6 +529,9 @@ export class KaraokeAppState {
   // Playback state
   get currentCode(): string { return this._currentCode; }
   get codeQueue(): readonly string[] { return Object.freeze([...this._codeQueue]); }
+  get queueHistory(): ReadonlyArray<{ code: string; song: Song; timestamp: number }> {
+    return Object.freeze([...this._queueHistory]);
+  }
   get currentSong(): Readonly<Song> | null {
     return this._currentSong ? Object.freeze({ ...this._currentSong }) : null;
   }
@@ -751,6 +769,7 @@ export class KaraokeAppState {
     return {
       currentCode: this._currentCode,
       codeQueue: [...this._codeQueue],
+      queueHistory: [...this._queueHistory],
       state: this._state,
       currentSong: this._currentSong ? { ...this._currentSong } : null,
       idleBackgroundPath: this._idleBackgroundPath,
@@ -781,6 +800,26 @@ export class KaraokeAppState {
    */
   isInQueue(code: string): boolean {
     return this._codeQueue.includes(code);
+  }
+  /**
+   * Get previous song code and remove from history
+   */
+  getPreviousSong(): string | null {
+    // Remove current song from history if it's the last one
+    if (this._queueHistory.length > 0 &&
+        this._queueHistory[this._queueHistory.length - 1].code === this._currentCode) {
+      this._queueHistory.pop();
+    }
+
+    // Get the previous song
+    if (this._queueHistory.length > 0) {
+      const prevEntry = this._queueHistory.pop();
+      console.log('[AppState] Previous song:', prevEntry?.code);
+      return prevEntry?.code || null;
+    }
+
+    console.log('[AppState] No previous song in history');
+    return null;
   }
   // Karaoke Viewer Lock
   async acquireKaraokeViewer(): Promise<boolean> {

@@ -1,6 +1,6 @@
 // ────────── App Entrypoint ──────────
 
-import { app, BrowserWindow, dialog, nativeImage, nativeTheme } from 'electron';
+import { app, BrowserWindow, dialog, nativeImage, nativeTheme, shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import ffmpeg from 'fluent-ffmpeg';
@@ -20,10 +20,13 @@ console.log(
 );
 
 import './core/events/ipc';
-import { additional_songs } from './core/utils/paths';
+import { additional_songs, main_path } from './core/utils/paths';
 import { getFFmpegPath } from './binaries/ffmpeg';
-import { ensureRuntime, installYtDlp } from './binaries/ytdlp';
 import { validate7zipBinaries } from './binaries/7zip';
+import { is } from '@electron-toolkit/utils';
+import cookieManager from './core/utils/cookie';
+import { installYtDlp } from './binaries/ytdlp';
+import { ensureRuntime } from './binaries/deno';
 
 // Directory Validator
 function isValidDirectory(dirPath: string): boolean {
@@ -74,13 +77,13 @@ app.whenReady().then(async () => {
   // 0. Setup window / app lifecycle logic
   setupCycles();
 
-  // 1. Prepare binaries (yt-dlp and ffmpeg)
-  await ensureRuntime();
-  await installYtDlp();
-  await validate7zipBinaries();
-
+  // 1. Prepare binaries
   const ffmpeg_path = await getFFmpegPath();
   ffmpeg.setFfmpegPath(ffmpeg_path);
+
+  await validate7zipBinaries();
+  await ensureRuntime();
+  await installYtDlp();
 
   // 2. Create main control window (settings / library UI)
   const mainWindow = new BrowserWindow({
@@ -99,7 +102,7 @@ app.whenReady().then(async () => {
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
-      devTools: process.env.NODE_ENV === 'development', // only enable devtools in dev
+      devTools: is.dev, // only enable devtools in dev
     },
   });
 
@@ -148,6 +151,23 @@ app.whenReady().then(async () => {
   const ok = await initializeAppState();
   if (!ok) {
     console.error('[startup] Another instance detected — exiting');
+
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: 'error',
+      title: 'Instance Already Running',
+      message: 'Another instance of the application is already running.',
+      detail: 'If you do not have the karaoke window open and this is a bug, click "Fix" to open the state folder and manually delete the lock file (karaoke.lock).',
+      buttons: ['Quit', 'Fix'],
+      defaultId: 0,
+      cancelId: 0
+    });
+
+    if (response === 1) {
+      // Fix button clicked - open the app state folder
+      const stateFolderPath = path.join(main_path, 'app_state');
+      shell.openPath(stateFolderPath);
+    }
+
     app.quit();
     return;
   }
@@ -202,6 +222,50 @@ app.whenReady().then(async () => {
   watchSongs();
   console.log('[startup] File watcher started');
 
-  // 9. Show the main window
+  // 9. Check YouTube cookie expiry
+  try {
+    const cookieStatus = await cookieManager.getCookieStatus();
+
+    if (cookieStatus.exists && cookieStatus.expiry) {
+      const expiryDate = new Date(cookieStatus.expiry);
+      const now = new Date();
+
+      // Check if cookies will expire within 7 days
+      const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (daysUntilExpiry <= 7 && daysUntilExpiry > 0) {
+        console.warn(`[yt-cookies] YouTube session expires in ${daysUntilExpiry} days`);
+
+        await dialog.showMessageBox(mainWindow, {
+          type: 'warning',
+          title: 'YouTube Session Expiring Soon',
+          message: `Your YouTube session will expire in ${daysUntilExpiry} day(s).`,
+          detail: 'Please login again in Settings to continue downloading age-restricted and members-only content.',
+          buttons: ['OK']
+        });
+      } else if (daysUntilExpiry <= 0) {
+        console.warn('[yt-cookies] YouTube session has expired');
+
+        // Cookies expired - clean up
+        await cookieManager.deleteCookies();
+
+        await dialog.showMessageBox(mainWindow, {
+          type: 'warning',
+          title: 'YouTube Session Expired',
+          message: 'Your YouTube session has expired.',
+          detail: 'Please login again in Settings to download age-restricted and members-only content.',
+          buttons: ['OK']
+        });
+      } else {
+        console.log(`[yt-cookies] YouTube session active, expires in ${daysUntilExpiry} days`);
+      }
+    } else if (!cookieStatus.exists) {
+      console.log('[yt-cookies] No YouTube session found');
+    }
+  } catch (error) {
+    console.error('[yt-cookies] Error checking cookie status:', error);
+  }
+
+  // 10. Show the main window
   mainWindow.show();
 });

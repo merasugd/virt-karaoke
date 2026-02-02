@@ -5,14 +5,15 @@ import { app } from 'electron';
 import { appState } from '../../events/app_state';
 import { db } from '../../utils/db';
 import { resolveSongIdFromCode, playNextInQueuePromise } from '../../utils/helpers';
-import { broadcastSongEnd, broadcastState } from '../../utils/state';
-import { 
-  downloadKaraokeSong, 
-  activeDownloads, 
-  getDownloadedSongs, 
-  deleteDownloadedSong 
+import { broadcastSongEnd, broadcastState, broadcastPlaybackControl } from '../../utils/state';
+import {
+  downloadKaraokeSong,
+  activeDownloads,
+  getDownloadedSongs,
+  deleteDownloadedSong
 } from '../services/download';
 import { searchSourcesForSong } from '../services/search';
+import { setSkipQuitConfirmation } from '../../events/cycles';
 
 export function setupApiRoutes(apiApp: Express) {
   // Get signature
@@ -58,7 +59,7 @@ export function setupApiRoutes(apiApp: Express) {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      
+
       if (message === 'Invalid filename') {
         return res.status(400).json({ error: message });
       }
@@ -80,6 +81,8 @@ export function setupApiRoutes(apiApp: Express) {
     console.log('[api] Action received:', action, { digit, query, downloadId, title, artist });
 
     let lastDigit: string | null = null;
+
+    if(!appState.isKaraokeViewerActive) return res.status(400).json({ error: 'No karaoke viewer is active!' })
 
     switch (action) {
       // Input digit
@@ -133,6 +136,106 @@ export function setupApiRoutes(apiApp: Express) {
         }
         break;
 
+      // Pause current song
+      case 'pause':
+        if (appState.currentSong && appState.currentState === 'karaoke') {
+          console.log('[playback] Pausing current song');
+          broadcastPlaybackControl('pause');
+        }
+        break;
+
+      // Resume current song
+      case 'resume':
+        if (appState.currentSong && appState.currentState === 'karaoke') {
+          console.log('[playback] Resuming current song');
+          broadcastPlaybackControl('resume');
+        }
+        break;
+
+      // Previous song (play previous from history)
+      case 'prev':
+        console.log('[playback] Previous song requested');
+        const prevCode = appState.getPreviousSong();
+
+        if (prevCode) {
+          // End current song if in karaoke mode
+          if (appState.currentState === 'karaoke' && appState.currentSong) {
+            broadcastSongEnd(appState.currentSong, 'skip');
+          }
+
+          // Add the previous song to the front of the queue
+          const currentQueue = [...appState.codeQueue];
+          await appState.clearQueue();
+          await appState.queueCode(prevCode);
+
+          // Re-add the rest of the queue
+          for (const code of currentQueue) {
+            await appState.queueCode(code);
+          }
+
+          // Play the previous song
+          await playNextInQueuePromise();
+          console.log('[playback] Playing previous song:', prevCode);
+        } else {
+          console.log('[playback] No previous song available');
+          // Just restart current song if in karaoke and no history
+          if (appState.currentSong && appState.currentState === 'karaoke') {
+            broadcastPlaybackControl('prev');
+          }
+        }
+        break;
+
+      // Seek forward 5 seconds
+      case 'seekForward':
+        if (appState.currentSong && appState.currentState === 'karaoke') {
+          console.log('[playback] Seek forward 5s');
+          broadcastPlaybackControl('seekForward', 5);
+        }
+        break;
+
+      // Seek backward 5 seconds
+      case 'seekBackward':
+        if (appState.currentSong && appState.currentState === 'karaoke') {
+          console.log('[playback] Seek backward 5s');
+          broadcastPlaybackControl('seekBackward', -5);
+        }
+        break;
+
+      // Set playback volume
+      case 'setVolume':
+        const { volume } = req.body;
+        if (typeof volume === 'number' && volume >= 0 && volume <= 1) {
+          console.log('[playback] Setting volume to', volume);
+          broadcastPlaybackControl('setVolume', volume);
+        }
+        break;
+
+      // Remove song from queue
+      case 'removeFromQueue': {
+        const { code } = req.body;
+        if (code && typeof code === 'string') {
+          await appState.removeFromQueue(code);
+          console.log(`[queue] Removed song ${code} from queue`);
+          broadcastState(null);
+        }
+        break;
+      }
+
+      // Reorder queue
+      case 'reorderQueue': {
+        const { newQueue } = req.body;
+        if (Array.isArray(newQueue)) {
+          // Clear current queue and add songs in new order
+          await appState.clearQueue();
+          for (const code of newQueue) {
+            await appState.queueCode(code);
+          }
+          console.log('[queue] Queue reordered');
+          broadcastState(null);
+        }
+        break;
+      }
+
       // Search song
       case 'search': {
         const q = (query || '').toLowerCase();
@@ -171,6 +274,7 @@ export function setupApiRoutes(apiApp: Express) {
             ? `${appState.currentSong.title} - ${appState.currentSong.artist}`
             : 'Select A Song',
           queue: [...appState.codeQueue],
+          queueHistory: [...appState.queueHistory],
           songId: appState.currentSong?.id ?? null,
           announceKeys: appState.announceKeys,
           backgroundType: appState.idleMode
@@ -216,6 +320,9 @@ export function setupApiRoutes(apiApp: Express) {
   apiApp.post('/shutdown', (_, res) => {
     console.log('[api] Shutdown requested');
     res.json({ ok: true });
+
+    // Skip quit confirmation dialog
+    setSkipQuitConfirmation(true);
 
     setTimeout(() => {
       console.log('[shutdown] Terminating application');

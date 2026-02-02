@@ -1,6 +1,14 @@
 // ────────── App Cycles ──────────
 
 import { app, dialog } from "electron";
+
+// Flag to track if shutdown was initiated programmatically
+let skipQuitConfirmation = false;
+
+export function setSkipQuitConfirmation(skip: boolean) {
+  skipQuitConfirmation = skip;
+}
+
 import { cleanupAndExit } from "../utils/helpers";
 import { karaokeServer, remoteServer, apiApp } from "../servers/app";
 import { wssKaraoke, wssRemote } from "../servers/websocket";
@@ -8,6 +16,11 @@ import { appState } from "./app_state";
 
 // Confirmation dialog before quitting
 async function confirmQuit() {
+  // Skip confirmation if shutdown was programmatic
+  if (skipQuitConfirmation) {
+    return true;
+  }
+
   const response = await dialog.showMessageBox({
     type: 'question',
     buttons: ['Cancel', 'Yes'],

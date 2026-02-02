@@ -71,20 +71,25 @@ export async function downloadKaraokeSong(downloadId: string, title: string, art
     // Sanitize filename
     const sanitizedTitle = title.replace(/[^a-z0-9]/gi, '_');
     const sanitizedArtist = artist.replace(/[^a-z0-9]/gi, '_');
-    const filename = `${sanitizedTitle} - ${sanitizedArtist}.mp4`;
+    const filename = (`${sanitizedTitle} - ${sanitizedArtist}.mp4`).replaceAll(' ', '_');
     const outputPath = path.join(downloadsDir, filename);
 
     // Download with youtube-dl
     console.log(`[download] Downloading to: ${outputPath}`);
+    console.log(`[download] Video URL: ${videoUrl}`);
 
     const downloadPromise = youtubedl(videoUrl, {
       output: outputPath,
       format: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
       mergeOutputFormat: 'mp4',
       noCheckCertificates: true,
-      noWarnings: true,
+      noWarnings: false, // Enable warnings to see what's happening
       preferFreeFormats: true,
+      verbose: true,
       addMetadata: true,
+      restrictFilenames: true, // Restrict filenames to ASCII characters
+      noOverwrites: false, // Allow overwrites
+      forceOverwrites: true, // Force overwrite existing files
     });
 
     // Track progress
@@ -97,27 +102,119 @@ export async function downloadKaraokeSong(downloadId: string, title: string, art
     }, 2000);
 
     // Wait for download to complete
-    await downloadPromise;
+    let downloadResult;
+    try {
+      downloadResult = await downloadPromise;
+      console.log('[download] yt-dlp completed successfully');
+      console.log('[download] Download result:', downloadResult);
+    } catch (dlError) {
+      clearInterval(progressInterval);
+      console.error('[download] yt-dlp error:', dlError);
+      throw dlError;
+    }
+
     clearInterval(progressInterval);
 
-    console.log(`[download] Download complete: ${filename}`);
+    // Wait a bit for file system to sync
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Check for the file with various possible extensions
+    const possibleFiles = [
+      outputPath,
+      outputPath.replace('.mp4', '.webm'),
+      outputPath.replace('.mp4', '.mkv'),
+    ];
+
+    let actualFile: string | null = null;
+    for (const filePath of possibleFiles) {
+      if (fs.existsSync(filePath)) {
+        actualFile = filePath;
+        console.log(`[download] Found file: ${filePath}`);
+        break;
+      }
+    }
+
+    // Also check the downloads directory for any new files
+    if (!actualFile) {
+      console.log('[download] Checking directory for new files...');
+      const files = fs.readdirSync(downloadsDir);
+      console.log('[download] Files in directory:', files);
+
+      // Look for files that might match
+      const searchPattern = sanitizedTitle.substring(0, 20); // First 20 chars of title
+      const matchingFiles = files.filter(f =>
+        f.includes(searchPattern) &&
+        (f.endsWith('.mp4') || f.endsWith('.webm') || f.endsWith('.mkv'))
+      );
+
+      if (matchingFiles.length > 0) {
+        actualFile = path.join(downloadsDir, matchingFiles[0]);
+        console.log(`[download] Found matching file: ${actualFile}`);
+      }
+    }
+
+    // Validate the downloaded file exists and has content
+    if (!actualFile || !fs.existsSync(actualFile)) {
+      console.error('[download] File not found at expected location');
+      console.error('[download] Expected:', outputPath);
+      console.error('[download] Downloads directory:', downloadsDir);
+      console.error('[download] Directory contents:', fs.readdirSync(downloadsDir));
+      throw new Error('The downloaded file does not exist. yt-dlp may have failed silently.');
+    }
+
+    const fileStats = fs.statSync(actualFile);
+    if (fileStats.size === 0) {
+      // Delete the empty file
+      fs.unlinkSync(actualFile);
+      throw new Error('The downloaded file is empty. This may be due to YouTube restrictions or the video being unavailable.');
+    }
+
+    console.log(`[download] Download complete: ${path.basename(actualFile)} (${(fileStats.size / 1024 / 1024).toFixed(2)} MB)`);
+
+    // If the actual file is different from expected, rename it
+    const finalFilename = path.basename(actualFile);
+    if (actualFile !== outputPath && actualFile.endsWith('.mp4')) {
+      try {
+        fs.renameSync(actualFile, outputPath);
+        console.log(`[download] Renamed ${actualFile} to ${outputPath}`);
+      } catch (renameErr) {
+        console.warn('[download] Could not rename file:', renameErr);
+        // Use the actual filename instead
+      }
+    }
 
     // Final progress update
-    broadcastDownloadProgress(downloadId, 100, 'complete', videoTitle, filename);
+    broadcastDownloadProgress(downloadId, 100, 'complete', videoTitle, finalFilename);
 
-    // Clean up from active downloads
-    setTimeout(() => {
-      activeDownloads.delete(downloadId);
-    }, 5000);
+    // Clean up from active downloads immediately
+    activeDownloads.delete(downloadId);
 
-    return { success: true, filename, videoTitle };
+    return { success: true, filename: finalFilename, videoTitle };
 
   } catch (error) {
     console.error(`[download] Error downloading ${title}:`, error);
+    let errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    if (errorMessage.includes('HTTP Error 403') || errorMessage.includes('Forbidden')) {
+      errorMessage = 'Download failed: YouTube blocked the download (HTTP 403 Forbidden). This usually means:\n\n' +
+                    '1. No JavaScript runtime installed (Node.js required for YouTube downloads)\n' +
+                    '2. Video may be age-restricted or region-locked\n' +
+                    '3. YouTube cookies may have expired\n\n' +
+                    'SOLUTION: Install Node.js from https://nodejs.org and restart the app.';
+    } else if (errorMessage.includes('Signature solving failed') || errorMessage.includes('JS runtimes: none')) {
+      errorMessage = 'Download failed: JavaScript runtime required but not found.\n\n' +
+                    'YouTube downloads require Node.js, Deno, Bun, or QuickJS to decrypt video URLs.\n\n' +
+                    'SOLUTION: Install Node.js from https://nodejs.org and restart the app.';
+    } else if (errorMessage.includes('The downloaded file is empty')) {
+      errorMessage = 'Download completed but the file is empty. This usually means:\n\n' +
+                    '1. All video fragments failed to download (likely due to missing JavaScript runtime)\n' +
+                    '2. Video may be restricted or unavailable\n\n' +
+                    'SOLUTION: Install Node.js from https://nodejs.org and restart the app.';
+    }
+
     broadcastDownloadProgress(downloadId, 0, 'error', undefined, undefined, errorMessage);
 
+    // Clean up from active downloads
     activeDownloads.delete(downloadId);
 
     return { success: false, error: errorMessage };

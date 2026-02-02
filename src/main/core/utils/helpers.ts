@@ -14,6 +14,7 @@ import { settings } from "../../settings";
 import { additional_songs, main_path } from "./paths";
 import { HorizontalAlign, Jimp, JimpInstance, VerticalAlign } from "jimp";
 import QRCode from 'qrcode';
+import { networkInterfaces } from "os";
 
 // Song code to id resolution
 export function resolveSongIdFromCode(code: string): string | null {
@@ -44,8 +45,7 @@ export function resolveSongIdFromCode(code: string): string | null {
 
 // Get IPv4 addresses
 export function getIPv4(interfaceName?: string): string | null {
-  const os = require('os');
-  const interfaces = os.networkInterfaces();
+  const interfaces = networkInterfaces();
 
   if (interfaceName && interfaces[interfaceName]) {
     for (const iface of interfaces[interfaceName]) {
@@ -57,6 +57,8 @@ export function getIPv4(interfaceName?: string): string | null {
 
   // Fallback: find any IPv4 address
   for (const name of Object.keys(interfaces)) {
+    if(!interfaces[name]) continue;
+
     for (const iface of interfaces[name]) {
       if (iface.family === 'IPv4' && !iface.internal) {
         return iface.address;

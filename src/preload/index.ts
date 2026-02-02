@@ -11,6 +11,9 @@ const electronAP = {
   saveSettings: (settings: any) => ipcRenderer.invoke('save-settings', settings),
   rescanSongs: () => ipcRenderer.send('rescan-songs'),
   getLanInfo: () => ipcRenderer.invoke('get-lan-info'),
+  getYtCookieStatus: () => ipcRenderer.invoke('get-yt-cookie-status'),
+  loginYouTube: () => ipcRenderer.invoke('login-youtube'),
+  deleteYtCookie: () => ipcRenderer.invoke('delete-yt-cookie'),
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

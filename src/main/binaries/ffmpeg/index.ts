@@ -4,6 +4,7 @@ import * as path from 'path'
 import * as fs from 'fs'
 import * as https from 'https'
 import * as http from 'http'
+import { execFileSync } from 'child_process'
 import { app, dialog } from 'electron'
 import { createProgressWindow } from '../../core/utils/progress'
 import { libraries } from '../../core/utils/paths'
@@ -27,15 +28,44 @@ interface PlatformInfo<
 const FFMPEG_DIR = path.join(libraries, 'ffmpeg')
 const VERSION_FILE = path.join(FFMPEG_DIR, 'version.txt')
 const LAST_UPDATE_CHECK_FILE = path.join(FFMPEG_DIR, 'last-update-check.txt')
-const UPDATE_CHECK_INTERVAL = 7 * 24 * 60 * 60 * 1000 // 7 days
+const UPDATE_CHECK_INTERVAL = 7 * 24 * 60 * 60 * 1000
+const SYSTEM_BINARY_MARKER = path.join(FFMPEG_DIR, 'system-binary.txt')
 
-/**
- * Show error dialog and exit app
- */
 function showErrorAndExit(title: string, message: string): never {
   dialog.showErrorBox(title, message)
   app.quit();
   throw new Error(message)
+}
+
+function probeSystemBinary(): string | null {
+  const candidates = process.platform === 'win32'
+    ? ['ffmpeg.exe', 'ffmpeg']
+    : ['ffmpeg']
+
+  for (const name of candidates) {
+    try {
+      const resolved = execFileSync(
+        process.platform === 'win32' ? 'where' : 'which',
+        [name],
+        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 3000 }
+      ).trim().split(/\r?\n/)[0].trim()
+
+      if (!resolved || !fs.existsSync(resolved)) continue
+
+      execFileSync(resolved, ['-version'], {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 5000
+      })
+
+      console.log('[ffmpeg] Found valid system binary:', resolved)
+      return resolved
+    } catch {
+      continue
+    }
+  }
+
+  return null
 }
 
 function getJohnVanSicklePlatform(name: string) {
@@ -151,19 +181,13 @@ function resolvePlatformInfo(platform: PlatformInfo) {
   return { url, binaryPath }
 }
 
-/**
- * Get version identifier from URL or generate one
- */
 function getVersionFromUrl(url: string): string {
-  // For GitHub releases with 'latest', use timestamp
   if (url.includes('/latest/')) {
-    return new Date().toISOString().split('T')[0] // YYYY-MM-DD
+    return new Date().toISOString().split('T')[0]
   }
-  // For evermeet.cx, use timestamp
   if (url.includes('evermeet.cx')) {
     return new Date().toISOString().split('T')[0]
   }
-  // For John Van Sickle, extract from URL
   const match = url.match(/ffmpeg-release-(.+)-static/)
   if (match) {
     return match[1]
@@ -171,34 +195,23 @@ function getVersionFromUrl(url: string): string {
   return 'unknown'
 }
 
-/**
- * Get current installed version
- */
 function getInstalledVersion(): string | null {
   try {
     if (fs.existsSync(VERSION_FILE)) {
       return fs.readFileSync(VERSION_FILE, 'utf-8').trim()
     }
   } catch (error) {
-    // Ignore
   }
   return null
 }
 
-/**
- * Save installed version
- */
 function saveInstalledVersion(version: string): void {
   try {
     fs.writeFileSync(VERSION_FILE, version)
   } catch (error) {
-    // Ignore write errors
   }
 }
 
-/**
- * Check if update check is needed
- */
 function shouldCheckForUpdate(): boolean {
   try {
     if (!fs.existsSync(LAST_UPDATE_CHECK_FILE)) {
@@ -214,14 +227,10 @@ function shouldCheckForUpdate(): boolean {
   }
 }
 
-/**
- * Update last check timestamp
- */
 function updateLastCheckTime(): void {
   try {
     fs.writeFileSync(LAST_UPDATE_CHECK_FILE, Date.now().toString())
   } catch (error) {
-    // Ignore
   }
 }
 
@@ -234,7 +243,6 @@ async function downloadFile(
     const protocol = url.startsWith('https') ? https : http
 
     const request = protocol.get(url, (response) => {
-      // Handle redirects
       if (response.statusCode === 301 || response.statusCode === 302) {
         const redirectUrl = response.headers.location
         if (redirectUrl) {
@@ -243,7 +251,6 @@ async function downloadFile(
         }
       }
 
-      // Handle errors
       if (response.statusCode === 404) {
         reject(new Error(`File not found (404): ${url}`))
         return
@@ -284,7 +291,6 @@ async function downloadFile(
       reject(err)
     })
 
-    // Set timeout
     request.setTimeout(30000, () => {
       request.destroy()
       reject(new Error('Download timeout'))
@@ -365,53 +371,73 @@ function findFFmpegBinary(extractDir: string, binaryPath: string): string | null
         }
       }
     } catch (err) {
-      // Ignore permission errors
     }
 
     return null
   }
 
-  // First try direct paths
   for (const searchPath of searchPaths) {
     if (fs.existsSync(searchPath)) {
       return searchPath
     }
   }
 
-  // Then search recursively
   return searchDirectory(extractDir)
 }
 
-/**
- * Install FFmpeg with error handling
- */
 async function installFFmpeg(forceUpdate: boolean = false): Promise<string> {
+  if (!fs.existsSync(FFMPEG_DIR)) {
+    fs.mkdirSync(FFMPEG_DIR, { recursive: true })
+  }
+
+  if (!forceUpdate) {
+    const cachedSystemBin = fs.existsSync(SYSTEM_BINARY_MARKER)
+      ? fs.readFileSync(SYSTEM_BINARY_MARKER, 'utf-8').trim()
+      : null
+
+    if (cachedSystemBin && fs.existsSync(cachedSystemBin)) {
+      try {
+        execFileSync(cachedSystemBin, ['-version'], {
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 5000
+        })
+        console.log('[ffmpeg] Using cached system binary:', cachedSystemBin)
+        return cachedSystemBin
+      } catch {
+        try { fs.unlinkSync(SYSTEM_BINARY_MARKER) } catch {}
+      }
+    }
+
+    const systemBin = probeSystemBinary()
+    if (systemBin) {
+      try {
+        fs.writeFileSync(SYSTEM_BINARY_MARKER, systemBin)
+      } catch {}
+      return systemBin
+    }
+  }
+
   const platform = getPlatformInfo()
   const { url, binaryPath } = resolvePlatformInfo(platform)
 
   const finalBinaryName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
   const installedBinaryPath = path.join(FFMPEG_DIR, finalBinaryName)
 
-  // Check if already installed and up-to-date
   const installedVersion = getInstalledVersion()
 
   if (!forceUpdate && fs.existsSync(installedBinaryPath) && installedVersion) {
-    // Check if we should check for updates
     if (shouldCheckForUpdate()) {
       const currentVersion = getVersionFromUrl(url)
       updateLastCheckTime()
 
-      // If versions match or we can't determine, use existing
       if (installedVersion === currentVersion) {
         return installedBinaryPath
       }
-      // Otherwise continue with update
     } else {
-      // Don't check yet, use existing
       return installedBinaryPath
     }
   } else if (!forceUpdate && fs.existsSync(installedBinaryPath)) {
-    // Binary exists but no version file, assume it's good
     return installedBinaryPath
   }
 
@@ -422,7 +448,6 @@ async function installFFmpeg(forceUpdate: boolean = false): Promise<string> {
     progressController.setTitle(installedVersion ? 'Updating FFmpeg' : 'Installing FFmpeg')
     progressController.setMessage('Preparing download...')
 
-    // Create directories
     if (!fs.existsSync(libraries)) {
       fs.mkdirSync(libraries, { recursive: true })
     }
@@ -430,8 +455,7 @@ async function installFFmpeg(forceUpdate: boolean = false): Promise<string> {
       fs.mkdirSync(FFMPEG_DIR, { recursive: true })
     }
 
-    // Download
-    const fileName = path.basename(url.split('?')[0]) // Remove query params
+    const fileName = path.basename(url.split('?')[0])
     const downloadPath = path.join(FFMPEG_DIR, fileName)
 
     progressController.setMessage('Downloading FFmpeg...')
@@ -463,7 +487,6 @@ async function installFFmpeg(forceUpdate: boolean = false): Promise<string> {
       )
     }
 
-    // Extract
     progressController.setIndeterminate(true)
     progressController.setMessage('Extracting archive...')
 
@@ -483,7 +506,6 @@ async function installFFmpeg(forceUpdate: boolean = false): Promise<string> {
         progressController.close()
       }
 
-      // Cleanup failed download
       try {
         fs.unlinkSync(downloadPath)
       } catch {}
@@ -497,7 +519,6 @@ async function installFFmpeg(forceUpdate: boolean = false): Promise<string> {
       )
     }
 
-    // Find and move binary
     progressController.setMessage('Installing binary...')
 
     const foundBinary = findFFmpegBinary(extractDir, binaryPath)
@@ -507,7 +528,6 @@ async function installFFmpeg(forceUpdate: boolean = false): Promise<string> {
         progressController.close()
       }
 
-      // Cleanup
       try {
         fs.rmSync(extractDir, { recursive: true, force: true })
         fs.unlinkSync(downloadPath)
@@ -526,20 +546,16 @@ async function installFFmpeg(forceUpdate: boolean = false): Promise<string> {
       )
     }
 
-    // Copy to final location
     fs.copyFileSync(foundBinary, installedBinaryPath)
 
-    // Make executable on Unix systems
     if (process.platform !== 'win32') {
       fs.chmodSync(installedBinaryPath, 0o755)
     }
 
-    // Save version
     const version = getVersionFromUrl(url)
     saveInstalledVersion(version)
     updateLastCheckTime()
 
-    // Cleanup
     progressController.setMessage('Cleaning up...')
     fs.rmSync(extractDir, { recursive: true, force: true })
     fs.unlinkSync(downloadPath)
@@ -556,7 +572,6 @@ async function installFFmpeg(forceUpdate: boolean = false): Promise<string> {
       progressController.close()
     }
 
-    // Generic error handler for unexpected errors
     showErrorAndExit(
       'FFmpeg Installation Error',
       `An unexpected error occurred during FFmpeg installation.\n\n` +
@@ -566,49 +581,30 @@ async function installFFmpeg(forceUpdate: boolean = false): Promise<string> {
   }
 }
 
-/**
- * Gets the FFmpeg binary path, installing it if necessary
- * @returns Path to the FFmpeg executable
- */
 export async function getFFmpegPath(): Promise<string> {
   return installFFmpeg(false)
 }
 
-/**
- * Force update FFmpeg to latest version
- */
 export async function updateFFmpeg(): Promise<string> {
   return installFFmpeg(true)
 }
 
-/**
- * Check if FFmpeg is installed
- */
 export function isFFmpegInstalled(): boolean {
   const finalBinaryName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
   const installedBinaryPath = path.join(FFMPEG_DIR, finalBinaryName)
-  return fs.existsSync(installedBinaryPath)
+  return fs.existsSync(installedBinaryPath) || fs.existsSync(SYSTEM_BINARY_MARKER)
 }
 
-/**
- * Get installed FFmpeg version
- */
 export function getFFmpegVersion(): string | null {
   return getInstalledVersion()
 }
 
-/**
- * Uninstall FFmpeg
- */
 export function uninstallFFmpeg(): void {
   if (fs.existsSync(FFMPEG_DIR)) {
     fs.rmSync(FFMPEG_DIR, { recursive: true, force: true })
   }
 }
 
-/**
- * Check if an update is recommended
- */
 export function shouldUpdate(): boolean {
   return shouldCheckForUpdate() || !isFFmpegInstalled()
 }
