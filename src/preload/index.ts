@@ -9,6 +9,7 @@ const electronAP = {
   hostKaraokeView: () => ipcRenderer.send('host-karaoke-view'),
   loadSettings: () => ipcRenderer.invoke('load-settings'),
   saveSettings: (settings: any) => ipcRenderer.invoke('save-settings', settings),
+  resetSettings: () => ipcRenderer.invoke('reset-settings'),
   rescanSongs: () => ipcRenderer.send('rescan-songs'),
   getLanInfo: () => ipcRenderer.invoke('get-lan-info'),
   getYtCookieStatus: () => ipcRenderer.invoke('get-yt-cookie-status'),

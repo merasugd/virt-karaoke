@@ -56,6 +56,19 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     onBack();
   };
 
+  const resetSettings = async () => {
+    const confirmed = confirm(
+      'Are you sure you want to reset all settings to default values?\n\nThis action cannot be undone.'
+    );
+    
+    if (confirmed) {
+      const result = await (window as any).electronAPI.resetSettings();
+      if (result) {
+        alert('Settings have been reset. The application will restart.');
+      }
+    }
+  };
+
   const pickFile = async (filters: { name: string; extensions: string[] }[], multi = false) => {
     const paths = await (window as any).electronAPI.openFileDialog({
       properties: multi ? ['openFile', 'multiSelections'] : ['openFile'],
@@ -94,6 +107,25 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     }
   };
 
+  // Media management helpers
+  const moveItem = (list: string[], index: number, direction: 'up' | 'down') => {
+    const newList = [...list];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    
+    if (targetIndex < 0 || targetIndex >= newList.length) return list;
+    
+    [newList[index], newList[targetIndex]] = [newList[targetIndex], newList[index]];
+    return newList;
+  };
+
+  const removeItem = (list: string[], index: number) => {
+    return list.filter((_, i) => i !== index);
+  };
+
+  const getFileName = (path: string) => {
+    return path.split(/[/\\]/).pop() || path;
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8 overflow-y-auto">
       <div className="max-w-5xl mx-auto space-y-8">
@@ -110,6 +142,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
           />
           <h1 className="text-3xl font-bold">Settings</h1>
         </div>
+        
         {/* VISUAL */}
         <Section title="Visual">
           <div>
@@ -123,47 +156,127 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               <option value="video">Video</option>
             </select>
           </div>
+          
           {settings.idleMode === 'image' && (
             <div className="mt-4">
               <label className="block mb-2">Idle Background Image</label>
-              <button
-                className="px-4 py-2 bg-blue-500 rounded"
-                onClick={async () => {
-                  const paths = await pickFile([{ name: 'Images', extensions: ['jpg', 'png', 'gif'] }]);
-                  if (paths.length) update('backgroundPath', paths[0]);
-                }}
-              >
-                Select Image {settings.backgroundPath ? `(Selected: ${settings.backgroundPath})` : ''}
-              </button>
+              <div className="space-y-2">
+                <button
+                  className="px-4 py-2 bg-blue-500 rounded hover:bg-blue-600 transition"
+                  onClick={async () => {
+                    const paths = await pickFile([{ name: 'Images', extensions: ['jpg', 'png', 'gif'] }]);
+                    if (paths.length) update('backgroundPath', paths[0]);
+                  }}
+                >
+                  Select Image
+                </button>
+                {settings.backgroundPath && (
+                  <div className="flex items-center gap-2 bg-gray-800 p-3 rounded">
+                    <span className="flex-1 text-sm truncate">{getFileName(settings.backgroundPath)}</span>
+                    <button
+                      onClick={() => update('backgroundPath', '')}
+                      className="px-3 py-1 bg-red-600 rounded text-sm hover:bg-red-700 transition"
+                      title="Remove image"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
+          
           {settings.idleMode === 'video' && (
             <div className="mt-4">
-              <label className="block mb-2">Idle Looping Videos</label>
+              <label className="block mb-3 font-semibold">Idle Looping Videos</label>
               <button
-                className="px-4 py-2 bg-blue-500 rounded"
+                className="px-4 py-2 bg-blue-500 rounded hover:bg-blue-600 transition mb-3"
                 onClick={async () => {
                   const paths = await pickFile([{ name: 'Videos', extensions: ['mp4'] }], true);
                   if (paths.length) update('idleVideoFiles', [...settings.idleVideoFiles, ...paths]);
                 }}
               >
-                Import Videos {settings.idleVideoFiles.length ? `(${settings.idleVideoFiles.length})` : ''}
+                + Add Videos ({settings.idleVideoFiles.length})
               </button>
+              
+              {settings.idleVideoFiles.length > 0 && (
+                <div className="space-y-2 bg-gray-800 p-4 rounded-lg">
+                  {settings.idleVideoFiles.map((videoPath: string, index: number) => (
+                    <div key={index} className="flex items-center gap-2 bg-gray-700 p-3 rounded">
+                      <span className="text-gray-400 font-mono text-sm w-8">{index + 1}.</span>
+                      <span className="flex-1 text-sm truncate" title={videoPath}>
+                        {getFileName(videoPath)}
+                      </span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => update('idleVideoFiles', moveItem(settings.idleVideoFiles, index, 'up'))}
+                          disabled={index === 0}
+                          className="px-2 py-1 bg-gray-600 rounded text-xs hover:bg-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                          title="Move up"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          onClick={() => update('idleVideoFiles', moveItem(settings.idleVideoFiles, index, 'down'))}
+                          disabled={index === settings.idleVideoFiles.length - 1}
+                          className="px-2 py-1 bg-gray-600 rounded text-xs hover:bg-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                          title="Move down"
+                        >
+                          ▼
+                        </button>
+                        <button
+                          onClick={() => update('idleVideoFiles', removeItem(settings.idleVideoFiles, index))}
+                          className="px-2 py-1 bg-red-600 rounded text-xs hover:bg-red-700 transition"
+                          title="Delete"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => {
+                      if (confirm('Remove all videos?')) {
+                        update('idleVideoFiles', []);
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-red-600 rounded text-sm hover:bg-red-700 transition mt-2"
+                  >
+                    Clear All Videos
+                  </button>
+                </div>
+              )}
             </div>
           )}
-          <div>
-            <label className="block mb-2 mt-4">Custom Font</label>
-            <button
-              className="px-4 py-2 bg-blue-500 rounded"
-              onClick={async () => {
-                const paths = await pickFile([{ name: 'Fonts', extensions: ['ttf'] }]);
-                if (paths.length) update('customFont', paths[0]);
-              }}
-            >
-              Select Font {settings.customFont ? `(Selected: ${settings.customFont})` : ''}
-            </button>
+          
+          <div className="mt-4">
+            <label className="block mb-2">Custom Font</label>
+            <div className="space-y-2">
+              <button
+                className="px-4 py-2 bg-blue-500 rounded hover:bg-blue-600 transition"
+                onClick={async () => {
+                  const paths = await pickFile([{ name: 'Fonts', extensions: ['ttf'] }]);
+                  if (paths.length) update('customFont', paths[0]);
+                }}
+              >
+                Select Font
+              </button>
+              {settings.customFont && (
+                <div className="flex items-center gap-2 bg-gray-800 p-3 rounded">
+                  <span className="flex-1 text-sm truncate">{getFileName(settings.customFont)}</span>
+                  <button
+                    onClick={() => update('customFont', '')}
+                    className="px-3 py-1 bg-red-600 rounded text-sm hover:bg-red-700 transition"
+                    title="Remove font"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </Section>
+        
         {/* AUDIO */}
         <Section title="Audio">
           <label className="flex items-center gap-2">
@@ -174,17 +287,68 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             />
             Loop Idle Music
           </label>
-          <div className="mt-2">
+          
+          <div className="mt-4">
+            <label className="block mb-3 font-semibold">Idle Music Playlist</label>
             <button
-              className="px-4 py-2 bg-blue-500 rounded"
+              className="px-4 py-2 bg-blue-500 rounded hover:bg-blue-600 transition mb-3"
               onClick={async () => {
                 const paths = await pickFile([{ name: 'Audio', extensions: ['mp3', 'wav'] }], true);
                 if (paths.length) update('musicFiles', [...settings.musicFiles, ...paths]);
               }}
             >
-              Import Songs {settings.musicFiles.length ? `(${settings.musicFiles.length})` : ''}
+              + Add Songs ({settings.musicFiles.length})
             </button>
+            
+            {settings.musicFiles.length > 0 && (
+              <div className="space-y-2 bg-gray-800 p-4 rounded-lg">
+                {settings.musicFiles.map((musicPath: string, index: number) => (
+                  <div key={index} className="flex items-center gap-2 bg-gray-700 p-3 rounded">
+                    <span className="text-gray-400 font-mono text-sm w-8">{index + 1}.</span>
+                    <span className="flex-1 text-sm truncate" title={musicPath}>
+                      {getFileName(musicPath)}
+                    </span>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => update('musicFiles', moveItem(settings.musicFiles, index, 'up'))}
+                        disabled={index === 0}
+                        className="px-2 py-1 bg-gray-600 rounded text-xs hover:bg-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                        title="Move up"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        onClick={() => update('musicFiles', moveItem(settings.musicFiles, index, 'down'))}
+                        disabled={index === settings.musicFiles.length - 1}
+                        className="px-2 py-1 bg-gray-600 rounded text-xs hover:bg-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                        title="Move down"
+                      >
+                        ▼
+                      </button>
+                      <button
+                        onClick={() => update('musicFiles', removeItem(settings.musicFiles, index))}
+                        className="px-2 py-1 bg-red-600 rounded text-xs hover:bg-red-700 transition"
+                        title="Delete"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <button
+                  onClick={() => {
+                    if (confirm('Remove all songs?')) {
+                      update('musicFiles', []);
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-red-600 rounded text-sm hover:bg-red-700 transition mt-2"
+                >
+                  Clear All Songs
+                </button>
+              </div>
+            )}
           </div>
+          
           <label className="flex items-center gap-2 mt-4">
             <input
               type="checkbox"
@@ -194,6 +358,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             Announce Key Presses
           </label>
         </Section>
+        
         {/* WINDOW */}
         <Section title="Window">
           <label className="block mb-2">Karaoke View Mode</label>
@@ -227,6 +392,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             </div>
           )}
         </Section>
+        
         {/* NETWORK */}
         <Section title="Network">
           <div>
@@ -260,6 +426,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             </button>
           </div>
         </Section>
+        
         {/* YOUTUBE AUTHENTICATION */}
         <Section title="YouTube Authentication">
           <div className="space-y-4">
@@ -305,26 +472,35 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             )}
           </div>
         </Section>
+        
         {/* ACTIONS */}
-        <div className="flex gap-4 pt-6">
+        <div className="flex gap-4 pt-6 pb-8">
           <button
             onClick={save}
-            className="px-8 py-3 bg-green-600 rounded-lg hover:bg-green-700"
+            className="px-8 py-3 bg-green-600 rounded-lg hover:bg-green-700 transition"
           >
             Save
           </button>
           <button
             onClick={onBack}
-            className="px-8 py-3 bg-gray-700 rounded-lg hover:bg-gray-600"
+            className="px-8 py-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition"
           >
             Cancel
+          </button>
+          <button
+            onClick={resetSettings}
+            className="px-8 py-3 bg-red-600 rounded-lg hover:bg-red-700 transition ml-auto"
+          >
+            Reset All Settings
           </button>
         </div>
       </div>
     </div>
   );
 };
+
 export default Settings;
+
 // Reusable Section Component
 const Section = ({ title, children }: any) => (
   <div className="bg-gray-800 rounded-xl p-6 space-y-4 border border-gray-700">

@@ -5,6 +5,90 @@ and the **[Keep a Changelog](__https://keepachangelog.com/__)** format.
 
 ---
 
+## [1.1.3] - 2026-02-04
+
+### ✨ Added - Advanced Media Management
+- **Enhanced idle video playlist management**
+  - Multi-select video import functionality
+  - Visual playlist display with sequential numbering
+  - Individual video deletion with ✕ button
+  - Drag-to-reorder functionality using up (▲) and down (▼) controls
+  - Bulk delete with "Clear All Videos" button
+  - File name display (truncated with full path on hover)
+  - Video count badge on import button
+
+- **Enhanced idle music playlist management**
+  - Multi-select audio file import
+  - Visual playlist display with track numbering
+  - Individual song deletion with ✕ button
+  - Drag-to-reorder functionality using up (▲) and down (▼) controls
+  - Bulk delete with "Clear All Songs" button
+  - File name display (truncated with full path on hover)
+  - Song count badge on import button
+
+- **Improved media file selection UI**
+  - Background image: File name display with Remove button
+  - Custom font: File name display with Remove button
+  - Visual feedback for all selected media files
+  - Consistent UI styling across all media types
+
+### ⚙️ Added - Settings Management
+- **Reset all settings functionality**
+  - "Reset All Settings" button in Settings page (positioned at bottom-right)
+  - Double confirmation system:
+    1. Browser confirm dialog with warning message
+    2. Native dialog with detailed warning about irreversibility
+  - Complete settings restoration to default values including:
+    - Visual settings (idle mode, backgrounds, videos, fonts)
+    - Audio settings (music files, looping, announcements)
+    - Window settings (view mode, dimensions)
+    - Network settings (LAN and remote ports)
+    - Search path
+  - YouTube authentication cookies are preserved (not reset)
+  - Automatic application restart after reset
+  - Full AppState synchronization with default settings
+
+### 🎨 Improved - User Interface
+- **Enhanced Settings page layout**
+  - Better visual hierarchy with consistent spacing
+  - Improved button styling with hover transitions
+  - Playlist management cards with gray backgrounds
+  - More intuitive media control buttons
+  - Clearer visual feedback for user actions
+  - Consistent transition effects throughout
+
+- **Better file information display**
+  - Truncated file names with ellipsis
+  - Full file path visible on hover (title attribute)
+  - Consistent file name extraction across all media types
+  - Better readability for long file paths
+
+### 🔧 Technical Improvements
+- **Enhanced IPC communication**
+  - New `reset-settings` IPC handler in main process
+  - Double confirmation using native Electron dialogs
+  - Proper error handling for reset operations
+  - Complete state synchronization after reset
+  - Automatic app relaunch after reset
+
+- **Code organization and quality**
+  - Added reusable helper functions:
+    - `moveItem()` - Reorder items in arrays (up/down)
+    - `removeItem()` - Delete items from arrays by index
+    - `getFileName()` - Extract filename from full path
+  - Improved TypeScript type safety
+  - Better component structure in Settings.tsx
+  - Consistent state management patterns
+
+- **Settings reset implementation**
+  - Uses `settings.reset()` to clear stored configuration
+  - Reloads default values from settings module
+  - Updates all AppState properties individually
+  - Ensures complete application state consistency
+  - Graceful restart mechanism with user confirmation
+
+---
+
 ## [1.1.2] - 2026-02-02
 
 ### 🐛 Fixed

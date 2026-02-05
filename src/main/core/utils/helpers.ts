@@ -348,6 +348,58 @@ export async function prepareAssets() {
       progress.setProgress(100);
     }
 
+    // Custom Font
+    progress.setTitle("Preparing Assets");
+    progress.setMessage("Processing custom font...");
+
+    if (appState.customFontPath) {
+      // Check if custom font file exists
+      if (!fs.existsSync(appState.customFontPath)) {
+        console.warn("[assets] Custom font file not found:", appState.customFontPath);
+        await appState.setCustomFontPath("");
+        settings.set("customFont", "");
+
+        await dialog.showMessageBox({
+          type: "warning",
+          title: "Missing Custom Font",
+          message: "The custom font file no longer exists.",
+          detail: "It has been removed from your settings. The default font will be used.",
+          buttons: ["OK"],
+        });
+      } else {
+        const hash = hashFiles([appState.customFontPath]);
+
+        if (cache.fontHash !== hash) {
+          console.log("[assets] Copying custom font");
+
+          const fontPath = path.join(assetsDir, "custom-font.ttf");
+
+          try {
+            // Copy the font file to assets directory
+            await fs.promises.copyFile(appState.customFontPath, fontPath);
+            cache.fontHash = hash;
+            console.log("[assets] Custom font copied successfully");
+          } catch (err) {
+            console.error("[assets] Failed to copy custom font:", err);
+            await dialog.showMessageBox({
+              type: "error",
+              title: "Font Copy Failed",
+              message: "Failed to copy the custom font file.",
+              detail: "The default font will be used instead.",
+              buttons: ["OK"],
+            });
+          }
+        } else {
+          console.log("[assets] Custom font cached");
+        }
+      }
+    } else {
+      // No custom font configured - use default
+      console.log("[assets] No custom font configured, using default");
+    }
+
+    progress.setMessage("Custom font ready ✓");
+
     saveCache(cache);
 
     // Brief completion message before closing
@@ -467,6 +519,7 @@ type AssetCache = {
   backgroundHash?: string;
   videoHash?: string;
   musicHash?: string;
+  fontHash?: string;
 };
 
 function hashFiles(files: string[]): string {

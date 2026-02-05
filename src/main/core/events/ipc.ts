@@ -146,6 +146,72 @@ ipcMain.handle('save-settings', async (_, newSettings) => {
   return true;
 });
 
+// Reset settings
+ipcMain.handle('reset-settings', async () => {
+  console.log('[settings] Resetting all settings to defaults');
+
+  const { response } = await dialog.showMessageBox({
+    type: 'warning',
+    title: 'Reset All Settings',
+    message: 'Are you sure you want to reset all settings?',
+    detail: 'This will restore all settings to their default values.\n\nThis action cannot be undone.',
+    buttons: ['Cancel', 'Reset'],
+    defaultId: 0,
+    cancelId: 0,
+  });
+
+  if (response === 1) {
+    // Reset settings
+    settings.reset();
+
+    // Reload default settings
+    const defaultSettings = settings.getAll();
+
+    // Update AppState with defaults
+    await appState.setIdleBackgroundPath(defaultSettings.backgroundPath ?? '');
+    await appState.setIdleMode(defaultSettings.idleMode ?? 'image');
+    await appState.setIdleVideoFiles(defaultSettings.idleVideoFiles ?? []);
+    await appState.setLoopingMusicEnabled(defaultSettings.loopingMusic ?? false);
+    await appState.setLoopingMusicFiles(defaultSettings.musicFiles ?? []);
+    await appState.setCustomFontPath(defaultSettings.customFont ?? '');
+    await appState.setViewMode(defaultSettings.viewMode ?? 'fullscreen');
+    await appState.setWindowSize(
+      defaultSettings.windowSize?.width ?? 1920,
+      defaultSettings.windowSize?.height ?? 1080
+    );
+    await appState.setKaraokePort(defaultSettings.lanPort ?? 4545);
+    await appState.setRemotePort(defaultSettings.remotePort ?? 4646);
+    await appState.setSearchPath(
+      defaultSettings.searchPath ??
+        path.join(__dirname, '..', '..', 'test')
+    );
+    await appState.setAnnounceKeys(defaultSettings.announceKeys ?? false);
+
+    console.log('[settings] Settings reset successfully');
+
+    // Ask for restart
+    const { response: restartResponse } = await dialog.showMessageBox({
+      type: 'info',
+      title: 'Settings Reset',
+      message: 'All settings have been reset to defaults.',
+      detail: 'The application needs to restart to apply changes.\n\nRestart now?',
+      buttons: ['Restart'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+
+    if (restartResponse === 0) {
+      console.log('[app] Restart requested after reset');
+      app.relaunch();
+      app.quit();
+    }
+
+    return true;
+  }
+
+  return false;
+});
+
 // Rescan songs
 ipcMain.on('rescan-songs', () => {
   console.log('[db] Manual rescan requested');
